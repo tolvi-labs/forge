@@ -36,3 +36,13 @@ def test_status_without_profile_is_graceful(tmp_path, monkeypatch):
     result = CliRunner().invoke(main, ["status"])
     assert result.exit_code == 0
     assert "not detected" in result.output.lower()
+
+
+def test_doctor_runs_and_reports_checks(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    result = CliRunner().invoke(main, ["doctor"])
+    assert result.exit_code == 0
+    assert "Ollama" in result.output
+    assert "Hardware profile" in result.output
+    assert "Config directory" in result.output
+    assert ("✅" in result.output) or ("❌" in result.output)
