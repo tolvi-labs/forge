@@ -107,19 +107,44 @@ def search(query: str, path: str, top_k: int) -> None:
                       f"({h.get('symbol_name', '')})")
 
 
-def _gather_cag(root: Path) -> list[str]:
+def _dedup_hits(hits: list[dict], cag_paths: set[str]) -> list[dict]:
+    """Drop RAG hits already included verbatim as CAG blocks (e.g. README/manifests)."""
+    return [h for h in hits if h.get("file_path") not in cag_paths]
+
+
+def _trim_history(history: str, max_tokens: int = 8000) -> str:
+    """Keep the most recent conversation turns under a token budget, dropping oldest turns first."""
+    from forge.chunker.chunk import count_tokens
+
+    if count_tokens(history) <= max_tokens:
+        return history
+    marker = "\nUser: "
+    # split into individual turns (each begins with the marker)
+    parts = history.split(marker)
+    turns = [marker + p for p in parts[1:]]  # drop any pre-marker prefix
+    kept: list[str] = []
+    for turn in reversed(turns):             # newest first
+        if count_tokens("".join([turn] + kept)) > max_tokens:
+            break
+        kept.insert(0, turn)
+    return "".join(kept)
+
+
+def _gather_cag(root: Path) -> tuple[list[str], set[str]]:
     from forge.vault.loader import load_vault
 
     blocks: list[str] = []
+    paths: set[str] = set()
     for name in ("README.md", "package.json", "pyproject.toml", "tsconfig.json"):
         f = root / name
         if f.is_file():
             text = f.read_text(encoding="utf-8", errors="replace")
             blocks.append(f"# {name}\n{text}")
+            paths.add(str(f))
     vault_block = load_vault(root)
     if vault_block:
         blocks.append(vault_block)
-    return blocks
+    return blocks, paths
 
 
 def _answer(root: Path, message: str, history: str) -> str:
@@ -131,8 +156,9 @@ def _answer(root: Path, message: str, history: str) -> str:
 
     repo_hash = hashlib.sha256(str(root).encode()).hexdigest()[:16]
     store = ChromaStore(config.data_dir() / "indexes" / repo_hash)
-    hits = retrieve(store, embedder.embed, message, top_k=6)
-    prompt = assemble(message, cag_blocks=_gather_cag(root), rag_hits=hits, history=history)
+    cag_blocks, cag_paths = _gather_cag(root)
+    hits = _dedup_hits(retrieve(store, embedder.embed, message, top_k=6), cag_paths)
+    prompt = assemble(message, cag_blocks=cag_blocks, rag_hits=hits, history=history)
     return generate(prompt)
 
 
@@ -154,7 +180,7 @@ def chat(path: str, message: str | None) -> None:
             break
         if msg.strip() in {"exit", "quit"}:
             break
-        answer = _answer(root, msg, history)
+        answer = _answer(root, msg, _trim_history(history))
         console.print(answer)
         history += f"\nUser: {msg}\nForge: {answer}\n"
 

@@ -3,7 +3,7 @@ from pathlib import Path
 from click.testing import CliRunner
 import forge.embedder.embedder as emb
 import forge.llm as llm_mod
-from forge.cli import main
+from forge.cli import main, _dedup_hits, _trim_history
 
 
 def _profile(tmp_path: Path) -> Path:
@@ -94,3 +94,24 @@ def test_chat_single_shot(tmp_path, monkeypatch):
         main, ["chat", "--path", str(proj), "--message", "how does sign_in work?"])
     assert result.exit_code == 0, result.output
     assert "ANSWER(saw" in result.output
+
+
+def test_dedup_hits_drops_cag_paths():
+    hits = [{"file_path": "/r/README.md", "content": "x"},
+            {"file_path": "/r/src/a.py", "content": "y"}]
+    out = _dedup_hits(hits, {"/r/README.md"})
+    assert [h["file_path"] for h in out] == ["/r/src/a.py"]
+
+
+def test_trim_history_keeps_recent_under_budget():
+    turns = "".join(f"\nUser: q{i}\nForge: {'word ' * 50}\n" for i in range(40))
+    trimmed = _trim_history(turns, max_tokens=200)
+    from forge.chunker.chunk import count_tokens
+    assert count_tokens(trimmed) <= 200
+    assert "q39" in trimmed          # most recent turn retained
+    assert "q0" not in trimmed       # oldest turns dropped
+
+
+def test_trim_history_noop_when_small():
+    h = "\nUser: hi\nForge: hello\n"
+    assert _trim_history(h, max_tokens=8000) == h
