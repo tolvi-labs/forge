@@ -89,10 +89,13 @@ def _watch(root: Path, run) -> None:
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
 
+    state = {"dirty": False, "last": 0.0}
+
     class _Handler(FileSystemEventHandler):
         def on_any_event(self, event) -> None:
             if not event.is_directory:
-                run()
+                state["dirty"] = True
+                state["last"] = time.monotonic()
 
     observer = Observer()
     observer.schedule(_Handler(), str(root), recursive=True)
@@ -100,7 +103,10 @@ def _watch(root: Path, run) -> None:
     console.print("[dim]Watching for changes — Ctrl-C to stop.[/]")
     try:
         while True:
-            time.sleep(1)
+            time.sleep(0.3)
+            if state["dirty"] and time.monotonic() - state["last"] >= 0.5:
+                state["dirty"] = False
+                run()
     except KeyboardInterrupt:
         observer.stop()
     observer.join()

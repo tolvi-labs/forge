@@ -37,7 +37,10 @@ class ChromaStore:
         if not chunks:
             return
         self._col.add(
-            ids=[c.chunk_id for c in chunks],
+            # Append a per-file sequence so two nodes sharing a line range
+            # (e.g. inline JSON pairs) get distinct Chroma IDs. Prior chunks for
+            # this file are deleted above, so the sequence is always fresh.
+            ids=[f"{c.chunk_id}#{i}" for i, c in enumerate(chunks)],
             embeddings=embeddings,
             documents=[c.content for c in chunks],
             metadatas=[{

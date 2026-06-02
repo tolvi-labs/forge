@@ -75,6 +75,6 @@ def chunk_source(source: str, *, language: str, file_path: str) -> list[Chunk]:
         chunks.append(Chunk.make(
             file_path=file_path, language=language, chunk_type="file",
             symbol_name=file_path, start_line=1,
-            end_line=max(1, source.count("\n")), content=text,
+            end_line=max(1, len(source.splitlines())), content=text,
         ))
     return chunks

@@ -50,3 +50,12 @@ def test_persistence_across_instances(tmp_path):
     s1.replace_file("a.py", "v1", [_chunk("a.py", 1, "x")], [[0.1, 0.2]])
     s2 = _store(tmp_path)
     assert s2.indexed_files() == {"a.py": "v1"}
+
+
+def test_replace_file_handles_same_line_chunks(tmp_path):
+    # Two chunks sharing a start/end line (e.g. inline JSON pairs) must not collide.
+    s = _store(tmp_path)
+    c1 = _chunk("a.json", 1, '"a": 1')
+    c2 = _chunk("a.json", 1, '"b": 2')
+    s.replace_file("a.json", "v1", [c1, c2], [[1.0, 0.0], [0.0, 1.0]])
+    assert s.count() == 2

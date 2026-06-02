@@ -50,3 +50,13 @@ def test_reindex_prunes_deleted_files(tmp_path):
     stats = index_repo(root, store, fake_embed)
     assert stats.files_pruned == 1
     assert not any(f.endswith("b.py") for f in store.indexed_files())
+
+
+def test_index_inline_json_no_id_collision(tmp_path):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "config.json").write_text('{"a": 1, "b": 2}\n')
+    store = ChromaStore(tmp_path / "idx")
+    stats = index_repo(root, store, fake_embed)  # must not raise
+    assert any(f.endswith("config.json") for f in store.indexed_files())
+    assert stats.files_indexed == 1
