@@ -14,6 +14,7 @@ _EXCLUDED_STATUS = {"superseded", "deprecated", "draft"}
 
 
 def _split_frontmatter(text: str) -> tuple[str, str]:
+    text = text.lstrip("﻿\r\n")  # tolerate a BOM / leading blank lines
     if text.startswith("---"):
         end = text.find("\n---", 3)
         if end != -1:
@@ -49,11 +50,16 @@ def _extract_tldr(body: str) -> str | None:
 def _read_doc(path: Path) -> dict | None:
     text = path.read_text(encoding="utf-8", errors="replace")
     fm, body = _split_frontmatter(text)
-    status = (_frontmatter_value(fm, "status") or "active").strip()
+    # Normalize before comparing: strip inline `# comment`, surrounding space, and
+    # case, so `status: Superseded` / `status: superseded # legacy` are still excluded.
+    raw_status = _frontmatter_value(fm, "status") or "active"
+    status = raw_status.split("#")[0].strip().lower()
     if status in _EXCLUDED_STATUS:
         return None
     tldr = _extract_tldr(body)
     summary = tldr if tldr else body.strip()
+    if not summary:  # frontmatter-only doc — nothing worth spending tokens on
+        return None
     return {"name": path.stem, "summary": summary}
 
 

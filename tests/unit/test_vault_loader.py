@@ -36,3 +36,38 @@ def test_load_vault_respects_token_budget(tmp_path):
     repo = _repo_with_vault(tmp_path)
     tiny = load_vault(repo, max_tokens=5)
     assert tiny is None or len(tiny) < 200
+
+
+def _repo_with_decision(tmp_path: Path, name: str, text: str) -> Path:
+    repo = tmp_path / "repo"
+    (repo / "vault" / "decisions").mkdir(parents=True)
+    (repo / "vault" / "decisions" / name).write_text(text)
+    return repo
+
+
+def test_load_vault_excludes_capitalized_status(tmp_path):
+    # status filtering must be case-insensitive — a capitalized Superseded must
+    # NOT leak into the model's context.
+    repo = _repo_with_decision(
+        tmp_path, "x.md",
+        "---\nstatus: Superseded\n---\n\n## Why\nleaks-through\n",
+    )
+    assert load_vault(repo) is None
+
+
+def test_load_vault_excludes_status_with_inline_comment(tmp_path):
+    repo = _repo_with_decision(
+        tmp_path, "x.md",
+        "---\nstatus: deprecated # legacy\n---\n\n## Why\nleaks-through\n",
+    )
+    assert load_vault(repo) is None
+
+
+def test_load_vault_tolerates_leading_blank_line(tmp_path):
+    # a leading blank line before --- must not blank the frontmatter (which would
+    # default status to active and leak an excluded doc)
+    repo = _repo_with_decision(
+        tmp_path, "x.md",
+        "\n---\nstatus: draft\n---\n\n## Why\nleaks-through\n",
+    )
+    assert load_vault(repo) is None
