@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from click.testing import CliRunner
+import forge.embedder.embedder as emb
 from forge.cli import main
 
 
@@ -46,3 +47,17 @@ def test_doctor_runs_and_reports_checks(tmp_path, monkeypatch):
     assert "Hardware profile" in result.output
     assert "Config directory" in result.output
     assert ("✅" in result.output) or ("❌" in result.output)
+
+
+def test_index_command_indexes_repo(tmp_path, monkeypatch):
+    monkeypatch.setattr(emb, "embed", lambda texts, **k: [[0.0, 1.0] for _ in texts])
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "a.py").write_text("def foo():\n    return 1\n")
+
+    result = CliRunner().invoke(main, ["index", str(proj)])
+    assert result.exit_code == 0, result.output
+    assert "indexed" in result.output.lower()
+    assert "1" in result.output
