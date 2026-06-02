@@ -1,3 +1,4 @@
+from forge.chunker import chunk_file, detect_language
 from forge.chunker.chunk import Chunk, count_tokens, checksum
 from forge.chunker.fallback import chunk_lines
 from forge.chunker.treesitter import chunk_source
@@ -74,3 +75,24 @@ def test_fallback_caps_large_block_with_overlap():
     chunks = chunk_lines(src, language="text", file_path="big.txt")
     assert len(chunks) >= 3
     assert chunks[1].start_line < chunks[0].end_line + 1 + 10
+
+
+def test_detect_language_by_extension():
+    assert detect_language("a.py") == "python"
+    assert detect_language("a.tsx") == "tsx"
+    assert detect_language("a.unknown") is None
+
+
+def test_chunk_file_python(tmp_path):
+    p = tmp_path / "m.py"
+    p.write_text("def foo():\n    return 1\n")
+    chunks = chunk_file(p)
+    assert any(c.symbol_name == "foo" for c in chunks)
+    assert all(c.file_path == str(p) for c in chunks)
+
+
+def test_chunk_file_unknown_extension_uses_fallback(tmp_path):
+    p = tmp_path / "notes.txt"
+    p.write_text("alpha\nbeta\n\ngamma\n")
+    chunks = chunk_file(p)
+    assert chunks and all(c.chunk_type == "block" for c in chunks)
