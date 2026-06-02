@@ -1,4 +1,5 @@
 from forge.chunker.chunk import Chunk, count_tokens, checksum
+from forge.chunker.fallback import chunk_lines
 from forge.chunker.treesitter import chunk_source
 
 PY_SRC = '''import os
@@ -57,3 +58,19 @@ def test_chunk_make_computes_fields():
     assert c.token_count == count_tokens("def foo():\n    pass")
     assert c.checksum == checksum("def foo():\n    pass")
     assert c.chunk_id == "src/a.py::1-2"
+
+
+def test_fallback_splits_on_blank_lines():
+    src = "block one\nline two\n\nblock two\nline\n"
+    chunks = chunk_lines(src, language="text", file_path="x.txt")
+    assert len(chunks) == 2
+    assert chunks[0].chunk_type == "block"
+    assert "block one" in chunks[0].content
+    assert chunks[1].start_line == 4
+
+
+def test_fallback_caps_large_block_with_overlap():
+    src = "\n".join(f"line {i}" for i in range(150)) + "\n"
+    chunks = chunk_lines(src, language="text", file_path="big.txt")
+    assert len(chunks) >= 3
+    assert chunks[1].start_line < chunks[0].end_line + 1 + 10
