@@ -1,0 +1,52 @@
+from pathlib import Path
+from forge.index import index_repo, IndexStats
+from forge.store.chroma import ChromaStore
+
+
+def fake_embed(texts):
+    return [[float(len(t)), float(sum(map(ord, t[:1])) if t else 0)] for t in texts]
+
+
+def _repo(tmp_path: Path) -> Path:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("def foo():\n    return 1\n")
+    (tmp_path / "src" / "b.py").write_text("def bar():\n    return 2\n")
+    (tmp_path / ".gitignore").write_text("ignored/\n*.log\n")
+    (tmp_path / "ignored").mkdir()
+    (tmp_path / "ignored" / "c.py").write_text("def nope(): pass\n")
+    (tmp_path / "debug.log").write_text("noise\n")
+    return tmp_path
+
+
+def test_index_respects_gitignore(tmp_path):
+    root = _repo(tmp_path)
+    store = ChromaStore(tmp_path / "idx")
+    stats = index_repo(root, store, fake_embed)
+    files = set(store.indexed_files())
+    assert any(f.endswith("src/a.py") for f in files)
+    assert any(f.endswith("src/b.py") for f in files)
+    assert not any("ignored" in f for f in files)
+    assert not any(f.endswith(".log") for f in files)
+    assert isinstance(stats, IndexStats)
+    assert stats.files_indexed == 2
+
+
+def test_reindex_skips_unchanged_and_picks_up_changes(tmp_path):
+    root = _repo(tmp_path)
+    store = ChromaStore(tmp_path / "idx")
+    index_repo(root, store, fake_embed)
+    stats2 = index_repo(root, store, fake_embed)
+    assert stats2.files_indexed == 0 and stats2.files_skipped == 2
+    (root / "src" / "a.py").write_text("def foo():\n    return 999\n")
+    stats3 = index_repo(root, store, fake_embed)
+    assert stats3.files_indexed == 1 and stats3.files_skipped == 1
+
+
+def test_reindex_prunes_deleted_files(tmp_path):
+    root = _repo(tmp_path)
+    store = ChromaStore(tmp_path / "idx")
+    index_repo(root, store, fake_embed)
+    (root / "src" / "b.py").unlink()
+    stats = index_repo(root, store, fake_embed)
+    assert stats.files_pruned == 1
+    assert not any(f.endswith("b.py") for f in store.indexed_files())
