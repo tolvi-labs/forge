@@ -11,16 +11,18 @@ from tree_sitter_language_pack import get_parser
 
 from forge.chunker.chunk import Chunk
 
+# Chunking granularity is class/function-level: `_collect` emits a target node and
+# does not descend into it, so a class is one chunk (its methods are not split out).
+# Method-level chunking (descending into class bodies, with overlap handling) is a
+# deferred refinement — see vault/decisions. Node-type maps below therefore omit
+# `method_definition`/`method_declaration`, which would be unreachable inside a class.
 _CHUNK_NODES: dict[str, dict[str, str]] = {
     "python": {"function_definition": "function", "class_definition": "class"},
-    "javascript": {"function_declaration": "function", "class_declaration": "class",
-                   "method_definition": "method"},
+    "javascript": {"function_declaration": "function", "class_declaration": "class"},
     "typescript": {"function_declaration": "function", "class_declaration": "class",
-                   "interface_declaration": "interface", "method_definition": "method"},
-    "tsx": {"function_declaration": "component", "class_declaration": "class",
-            "method_definition": "method"},
-    "java": {"class_declaration": "class", "interface_declaration": "interface",
-             "method_declaration": "method"},
+                   "interface_declaration": "interface"},
+    "tsx": {"function_declaration": "component", "class_declaration": "class"},
+    "java": {"class_declaration": "class", "interface_declaration": "interface"},
     "css": {"rule_set": "rule-set"},
     "html": {"element": "element"},
     "json": {"pair": "pair"},
