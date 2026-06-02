@@ -2,12 +2,44 @@
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 *.egg-info/
 build/
 dist/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
-# Forge runtime artifacts (never committed)
+# Secrets & local env — never commit (but keep example templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+*.pem
+*.key
+*.pfx
+*.p12
+credentials.json
+service-account*.json
+gha-creds-*.json
+.continue/
+
+# Node / MCP tooling (arrives in P4)
+node_modules/
+npm-debug.log*
+
+# Forge runtime artifacts (written to XDG dirs, never the repo)
 *.chroma/
 hardware-profile.json
+Modelfile
+
+# OS & editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
