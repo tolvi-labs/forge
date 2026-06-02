@@ -85,6 +85,80 @@ def index(path: str, watch: bool) -> None:
         _watch(root, run)
 
 
+@main.command()
+@click.argument("query")
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+@click.option("--top-k", default=6, show_default=True)
+def search(query: str, path: str, top_k: int) -> None:
+    """Show the code chunks Forge retrieves for a query."""
+    from forge.embedder import embedder
+    from forge.retriever.retriever import retrieve
+    from forge.store.chroma import ChromaStore
+
+    root = Path(path).resolve()
+    repo_hash = hashlib.sha256(str(root).encode()).hexdigest()[:16]
+    store = ChromaStore(config.data_dir() / "indexes" / repo_hash)
+    hits = retrieve(store, embedder.embed, query, top_k=top_k)
+    if not hits:
+        console.print("[yellow]No results. Have you run `forge index` here?[/]")
+        return
+    for h in hits:
+        console.print(f"[bold]{h['file_path']}:{h['start_line']}-{h['end_line']}[/] "
+                      f"({h.get('symbol_name', '')})")
+
+
+def _gather_cag(root: Path) -> list[str]:
+    from forge.vault.loader import load_vault
+
+    blocks: list[str] = []
+    for name in ("README.md", "package.json", "pyproject.toml", "tsconfig.json"):
+        f = root / name
+        if f.is_file():
+            text = f.read_text(encoding="utf-8", errors="replace")
+            blocks.append(f"# {name}\n{text}")
+    vault_block = load_vault(root)
+    if vault_block:
+        blocks.append(vault_block)
+    return blocks
+
+
+def _answer(root: Path, message: str, history: str) -> str:
+    from forge.assembler import assemble
+    from forge.embedder import embedder
+    from forge.llm import generate
+    from forge.retriever.retriever import retrieve
+    from forge.store.chroma import ChromaStore
+
+    repo_hash = hashlib.sha256(str(root).encode()).hexdigest()[:16]
+    store = ChromaStore(config.data_dir() / "indexes" / repo_hash)
+    hits = retrieve(store, embedder.embed, message, top_k=6)
+    prompt = assemble(message, cag_blocks=_gather_cag(root), rag_hits=hits, history=history)
+    return generate(prompt)
+
+
+@main.command()
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+@click.option("--message", "-m", default=None, help="Single-shot question; omit for a REPL.")
+def chat(path: str, message: str | None) -> None:
+    """Chat with the local model using CAG+RAG context from this repo."""
+    root = Path(path).resolve()
+    if message is not None:
+        console.print(_answer(root, message, history=""))
+        return
+    console.print("[dim]Forge chat — Ctrl-C or 'exit' to quit.[/]")
+    history = ""
+    while True:
+        try:
+            msg = click.prompt("you", prompt_suffix="> ")
+        except (EOFError, click.Abort):
+            break
+        if msg.strip() in {"exit", "quit"}:
+            break
+        answer = _answer(root, msg, history)
+        console.print(answer)
+        history += f"\nUser: {msg}\nForge: {answer}\n"
+
+
 def _watch(root: Path, run) -> None:
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer

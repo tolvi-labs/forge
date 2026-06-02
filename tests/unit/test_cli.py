@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from click.testing import CliRunner
 import forge.embedder.embedder as emb
+import forge.llm as llm_mod
 from forge.cli import main
 
 
@@ -61,3 +62,35 @@ def test_index_command_indexes_repo(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "indexed" in result.output.lower()
     assert "1" in result.output
+
+
+def test_search_prints_hits(tmp_path, monkeypatch):
+    monkeypatch.setattr(emb, "embed", lambda texts, **k: [[0.0, 1.0] for _ in texts])
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "auth.py").write_text("def sign_in():\n    return 1\n")
+    CliRunner().invoke(main, ["index", str(proj)])
+
+    result = CliRunner().invoke(main, ["search", "sign_in", "--path", str(proj)])
+    assert result.exit_code == 0, result.output
+    assert "sign_in" in result.output
+
+
+def test_chat_single_shot(tmp_path, monkeypatch):
+    monkeypatch.setattr(emb, "embed", lambda texts, **k: [[0.0, 1.0] for _ in texts])
+    monkeypatch.setattr(llm_mod, "generate",
+                        lambda prompt, **k: f"ANSWER(saw {len(prompt)} chars)")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "auth.py").write_text("def sign_in():\n    return 1\n")
+    (proj / "README.md").write_text("# Demo project\n")
+    CliRunner().invoke(main, ["index", str(proj)])
+
+    result = CliRunner().invoke(
+        main, ["chat", "--path", str(proj), "--message", "how does sign_in work?"])
+    assert result.exit_code == 0, result.output
+    assert "ANSWER(saw" in result.output
