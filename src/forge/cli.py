@@ -207,9 +207,9 @@ def plan_load(tasks_json: str, path: str) -> None:
     root = Path(path).resolve()
     try:
         manifest = load_manifest(tasks_json)
-    except ManifestError as exc:
+        load_plan(root, _plan_dir(root), manifest)
+    except (ManifestError, RuntimeError) as exc:
         raise click.ClickException(str(exc)) from exc
-    load_plan(root, _plan_dir(root), manifest)
     console.print(f"Loaded plan: [bold]{manifest.feature}[/] "
                   f"({len(manifest.tasks)} tasks)")
 

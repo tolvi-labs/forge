@@ -168,3 +168,20 @@ def test_plan_flow(tmp_path, monkeypatch):
     out = r.invoke(main, ["verify", "--path", str(repo)])
     assert out.exit_code == 0
     assert "feature.py" in out.output
+
+
+def test_verify_out_writes_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    tasks = _tasks_file(repo)
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    (repo / "feature.py").write_text("x = 1\n")
+    r.invoke(main, ["plan", "complete", "task-001", "--path", str(repo)])
+    out_file = tmp_path / "bundle.md"
+    res = r.invoke(main, ["verify", "--path", str(repo), "--out", str(out_file)])
+    assert res.exit_code == 0, res.output
+    assert out_file.exists()
+    assert "feature.py" in out_file.read_text()

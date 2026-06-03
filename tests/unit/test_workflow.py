@@ -3,6 +3,7 @@ from pathlib import Path
 from forge.plan import workflow
 from forge.plan.manifest import load_manifest
 import json
+import pytest
 
 
 def _git(repo, *args):
@@ -75,3 +76,10 @@ def test_verify_exports_diff_since_baseline(tmp_path):
     assert "feature.py" in out["diff"]
     assert out["manifest"]["feature"] == "F"
     assert out["completed"] == ["task-001"]
+
+
+def test_load_plan_on_non_git_dir_raises(tmp_path):
+    not_a_repo = tmp_path / "plain"
+    not_a_repo.mkdir()
+    with pytest.raises(RuntimeError):
+        workflow.load_plan(not_a_repo, tmp_path / "pd", _manifest(tmp_path))
