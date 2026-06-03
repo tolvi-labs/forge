@@ -1,4 +1,6 @@
 import json
+import json as _json
+import subprocess as _sub
 from pathlib import Path
 from click.testing import CliRunner
 import forge.embedder.embedder as emb
@@ -115,3 +117,54 @@ def test_trim_history_keeps_recent_under_budget():
 def test_trim_history_noop_when_small():
     h = "\nUser: hi\nForge: hello\n"
     assert _trim_history(h, max_tokens=8000) == h
+
+
+def _init_repo(path):
+    _sub.run(["git", "-C", str(path), "init", "-q"], check=True)
+    _sub.run(["git", "-C", str(path), "config", "user.email", "t@e.com"], check=True)
+    _sub.run(["git", "-C", str(path), "config", "user.name", "t"], check=True)
+    (path / "seed.txt").write_text("s\n")
+    _sub.run(["git", "-C", str(path), "add", "-A"], check=True)
+    _sub.run(["git", "-C", str(path), "commit", "-q", "-m", "seed"], check=True)
+
+
+def _tasks_file(path):
+    data = {"feature": "Demo", "tasks": [
+        {"id": "task-001", "title": "do first", "acceptance_criteria": ["x"]},
+        {"id": "task-002", "title": "do second", "dependencies": ["task-001"],
+         "acceptance_criteria": ["y"]},
+    ]}
+    f = path / "tasks.json"
+    f.write_text(_json.dumps(data))
+    return f
+
+
+def test_plan_flow(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    tasks = _tasks_file(repo)
+    r = CliRunner()
+
+    out = r.invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    assert out.exit_code == 0, out.output
+    assert "Demo" in out.output
+
+    out = r.invoke(main, ["plan", "next", "--path", str(repo)])
+    assert out.exit_code == 0
+    assert "task-001" in out.output
+
+    (repo / "feature.py").write_text("x = 1\n")
+    out = r.invoke(main, ["plan", "complete", "task-001", "--path", str(repo)])
+    assert out.exit_code == 0
+
+    out = r.invoke(main, ["plan", "next", "--path", str(repo)])
+    assert "task-002" in out.output
+
+    out = r.invoke(main, ["plan", "status", "--path", str(repo)])
+    assert "task-001" in out.output and "task-002" in out.output
+
+    out = r.invoke(main, ["verify", "--path", str(repo)])
+    assert out.exit_code == 0
+    assert "feature.py" in out.output

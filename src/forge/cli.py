@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import time
 from pathlib import Path
@@ -183,6 +184,117 @@ def chat(path: str, message: str | None) -> None:
         answer = _answer(root, msg, _trim_history(history))
         console.print(answer)
         history += f"\nUser: {msg}\nForge: {answer}\n"
+
+
+def _plan_dir(root: Path) -> Path:
+    repo_hash = hashlib.sha256(str(root).encode()).hexdigest()[:16]
+    return config.data_dir() / "plans" / repo_hash
+
+
+@main.group()
+def plan() -> None:
+    """Load and drive a Claude-produced tasks.json plan."""
+
+
+@plan.command("load")
+@click.argument("tasks_json", type=click.Path(exists=True, dir_okay=False))
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+def plan_load(tasks_json: str, path: str) -> None:
+    """Validate a tasks.json and make it the active plan for this repo."""
+    from forge.plan.manifest import ManifestError, load_manifest
+    from forge.plan.workflow import load_plan
+
+    root = Path(path).resolve()
+    try:
+        manifest = load_manifest(tasks_json)
+    except ManifestError as exc:
+        raise click.ClickException(str(exc)) from exc
+    load_plan(root, _plan_dir(root), manifest)
+    console.print(f"Loaded plan: [bold]{manifest.feature}[/] "
+                  f"({len(manifest.tasks)} tasks)")
+
+
+@plan.command("next")
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+def plan_next(path: str) -> None:
+    """Show the next dependency-unblocked task."""
+    from forge.plan.manifest import Manifest, next_task
+    from forge.plan.workflow import read_state
+
+    root = Path(path).resolve()
+    pdir = _plan_dir(root)
+    manifest = Manifest.from_dict(json.loads((pdir / "manifest.json").read_text()))
+    state = read_state(pdir)
+    task = next_task(manifest, set(state["completed"]))
+    if task is None:
+        console.print("[green]All tasks complete.[/]")
+        return
+    console.print(f"[bold]{task.id}[/] — {task.title}")
+    for crit in task.acceptance_criteria:
+        console.print(f"  • {crit}")
+
+
+@plan.command("complete")
+@click.argument("task_id")
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+def plan_complete(task_id: str, path: str) -> None:
+    """Mark a task done and auto-commit its changes."""
+    from forge.plan.manifest import Manifest
+    from forge.plan.workflow import complete, read_state
+
+    root = Path(path).resolve()
+    pdir = _plan_dir(root)
+    manifest = Manifest.from_dict(json.loads((pdir / "manifest.json").read_text()))
+    task = manifest.task(task_id)
+    if task is None:
+        raise click.ClickException(f"No such task: {task_id}")
+    complete(root, pdir, task_id, task.title)
+    done = len(read_state(pdir)["completed"])
+    console.print(f"Completed [bold]{task_id}[/] ({done}/{len(manifest.tasks)}).")
+
+
+@plan.command("status")
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+def plan_status(path: str) -> None:
+    """Show completion status of every task."""
+    from forge.plan.manifest import Manifest, next_task
+    from forge.plan.workflow import read_state
+
+    root = Path(path).resolve()
+    pdir = _plan_dir(root)
+    manifest = Manifest.from_dict(json.loads((pdir / "manifest.json").read_text()))
+    completed = set(read_state(pdir)["completed"])
+    nxt = next_task(manifest, completed)
+    for t in manifest.tasks:
+        if t.id in completed:
+            mark = "[green]done[/]"
+        elif nxt is not None and t.id == nxt.id:
+            mark = "[yellow]next[/]"
+        elif all(d in completed for d in t.dependencies):
+            mark = "ready"
+        else:
+            mark = "[dim]blocked[/]"
+        console.print(f"{mark}\t{t.id}\t{t.title}")
+
+
+@main.command()
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+@click.option("--out", type=click.Path(dir_okay=False), default=None,
+              help="Write the verification bundle to a file instead of stdout.")
+def verify(path: str, out: str | None) -> None:
+    """Export the diff + manifest since plan load for Claude's review."""
+    from forge.plan.workflow import verify as run_verify
+
+    root = Path(path).resolve()
+    bundle = run_verify(root, _plan_dir(root))
+    text = (f"# Verification for: {bundle['manifest']['feature']}\n"
+            f"# Completed: {', '.join(bundle['completed']) or 'none'}\n\n"
+            f"## Diff since plan baseline\n```diff\n{bundle['diff']}\n```\n")
+    if out:
+        Path(out).write_text(text, encoding="utf-8")
+        console.print(f"Wrote verification bundle to {out}")
+    else:
+        console.print(text)
 
 
 def _watch(root: Path, run) -> None:
