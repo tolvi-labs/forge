@@ -52,3 +52,11 @@ def test_next_task_respects_dependencies():
     assert next_task(m, completed=set()).id == "task-001"
     assert next_task(m, completed={"task-001"}).id == "task-002"
     assert next_task(m, completed={"task-001", "task-002"}) is None
+
+
+def test_load_manifest_rejects_unknown_dependency(tmp_path):
+    bad = {"feature": "x", "tasks": [
+        {"id": "t1", "title": "t", "dependencies": ["ghost"], "acceptance_criteria": ["x"]},
+    ]}
+    with pytest.raises(ManifestError):
+        load_manifest(_write(tmp_path, bad))

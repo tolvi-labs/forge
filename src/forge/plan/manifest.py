@@ -79,7 +79,14 @@ def load_manifest(path: str | Path) -> Manifest:
         jsonschema.validate(data, TASKS_SCHEMA)
     except jsonschema.ValidationError as exc:
         raise ManifestError(f"tasks.json failed schema validation: {exc.message}") from exc
-    return Manifest.from_dict(data)
+    manifest = Manifest.from_dict(data)
+    ids = {t.id for t in manifest.tasks}
+    for t in manifest.tasks:
+        for dep in t.dependencies:
+            if dep not in ids:
+                raise ManifestError(
+                    f"Task '{t.id}' depends on unknown task '{dep}'")
+    return manifest
 
 
 def next_task(manifest: Manifest, completed: set[str]) -> Task | None:
