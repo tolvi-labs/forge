@@ -13,7 +13,13 @@ OS=$(uname -s)
 if [[ "$OS" == "Darwin" ]]; then
   RAM_GB=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
 elif [[ "$OS" == "Linux" ]]; then
-  RAM_GB=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+  RAM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+  if [[ "$RAM_KB" =~ ^[0-9]+$ ]]; then
+    RAM_GB=$(( RAM_KB / 1024 / 1024 ))
+  else
+    echo "⚠️  Could not read /proc/meminfo; defaulting to 8GB profile." >&2
+    RAM_GB=8
+  fi
 else
   echo "⚠️  Unsupported OS: $OS. Defaulting to 8GB profile." >&2
   RAM_GB=8
