@@ -57,12 +57,21 @@ uv venv --python 3.12 "$REPO_DIR/.venv"
 source "$REPO_DIR/.venv/bin/activate"
 uv pip install -e "$REPO_DIR"
 
-# 6. Summary
-echo "Step 6/6 — Done."
+# 6. Editor + MCP configs
+echo "Step 6/7 — Installing editor + MCP configs..."
+mkdir -p "$HOME/.continue" "$CONFIG_DIR/mcp"
+cp "$REPO_DIR/integrations/vscode/config.yaml" "$HOME/.continue/config.yaml"
+cp "$REPO_DIR/mcp/servers.json" "$CONFIG_DIR/mcp/servers.json"
+echo "   Continue config -> ~/.continue/config.yaml"
+echo "   MCP servers     -> $CONFIG_DIR/mcp/servers.json (add credentials before use)"
+
+# 7. Summary
+echo "Step 7/7 — Done."
 echo "────────────────────────────────────"
 echo "   Model        : forge-coder ($RECOMMENDED_MODEL)"
 echo "   Context      : $MAX_CONTEXT tokens"
 echo "   Config       : $CONFIG_DIR"
 echo "   CLI          : activate with 'source $REPO_DIR/.venv/bin/activate', then 'forge status'"
 echo ""
-echo "   Editor setup (Continue/Cursor) and 'forge index' arrive in P2–P4."
+echo "   Editors      : Continue config installed; see integrations/cursor for Cursor"
+echo "   Next         : add MCP credentials in $CONFIG_DIR/mcp/servers.json, then 'forge index .'"
