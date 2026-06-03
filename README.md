@@ -1,8 +1,8 @@
 # Forge
 
-A local-first AI development environment. A tuned local model does the high-volume implementation work; Claude plans and verifies. Zero token cost and full privacy during execution.
+A local-first AI development environment. A tuned local model (qwen2.5-coder via Ollama) does the high-volume implementation work; Claude plans and verifies. Zero token cost and full privacy during execution.
 
-> **Status:** Pre-1.0 — Phase 1 (skeleton + installer). See [`ROADMAP.md`](./ROADMAP.md).
+> **Status:** Pre-1.0 — MVP complete (phases P1–P5). The full local loop works end-to-end; packaged distribution (Homebrew / PyPI / Docker) is the remaining work. See [`ROADMAP.md`](./ROADMAP.md).
 
 ## The workflow
 
@@ -10,7 +10,7 @@ A local-first AI development environment. A tuned local model does the high-volu
 Claude (plan → tasks.json) → Forge (execute, local, $0) → Claude (verify diff)
 ```
 
-Claude is better at *thinking*; the local model is better at *doing at scale*. Forge is the execution layer between them.
+Claude is better at *thinking*; the local model is better at *doing at scale*. Forge is the execution layer between them — it indexes your codebase, answers questions with that code (and your decisions) in context, drives a Claude-produced plan task-by-task, and hands the diff back for review.
 
 ## Tolvi is the substrate
 
@@ -25,7 +25,42 @@ git clone https://github.com/tolvi-labs/forge && cd forge
 bash setup/bootstrap.sh
 ```
 
-Then `forge status` to confirm.
+The installer detects your hardware, pulls the right Ollama models, builds the `forge-coder` model, installs the CLI into a dedicated Python 3.12 venv, and writes the Continue.dev + MCP configs. Then `forge status` to confirm and `forge doctor` to diagnose.
+
+## Quickstart
+
+```bash
+forge index .                       # index this repo (incremental, respects .gitignore)
+forge search "auth token refresh"   # inspect what retrieval returns
+forge chat -m "how does sign-in work?"   # ask, with CAG+RAG (and your Tolvi vault) in context
+
+# Claude → Local → Claude
+forge plan load tasks.json          # load a Claude-produced plan (schema-validated)
+forge plan next                     # next dependency-unblocked task
+forge plan complete task-001        # mark done + auto-commit the work
+forge verify                        # export the diff + manifest for Claude to review
+```
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `forge status` / `doctor` | Active model/context/profile; environment diagnostics |
+| `forge index [--watch]` | Tree-sitter chunk + embed a repo into a local ChromaDB index |
+| `forge search` / `chat` | Semantic retrieval; chat with CAG+RAG context (Tolvi vault included) |
+| `forge plan load/next/complete/status` | Drive a Claude `tasks.json` in dependency order, auto-committing per task |
+| `forge verify` | Export the diff since plan baseline + manifest for Claude's review |
+| `forge profile list/set` | Choose the stack profile that shapes the context window |
+| `forge agents run` | Multi-agent scaffold: code + review per task (proposes, doesn't auto-apply) |
+
+## How it works
+
+- **Index** — Tree-sitter AST chunking across 9 languages (with a line-based fallback), local embeddings via `nomic-embed-text`, a ChromaDB store with file-checksum incremental re-indexing.
+- **Context** — a hybrid **CAG + RAG** window: stable always-on context (manifests, README, the Tolvi vault) plus the top semantically-relevant code chunks (hard-capped to avoid lost-in-the-middle), tuned per [stack profile](./src/forge/profiles_data).
+- **Workflow** — `tasks.json` is the Claude↔Forge handoff contract; Forge validates it, tracks completion, auto-commits per task, and exports a verifiable diff.
+- **Editors & tools** — Continue.dev (VS Code, primary) and Cursor against the same Ollama backend; a pre-wired, npm-verified [MCP layer](./mcp/servers.json) (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright).
+
+Everything runs locally — no code leaves the machine during execution. Architecture and design notes live in [`docs/`](./docs).
 
 ## License
 
