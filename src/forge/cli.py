@@ -169,8 +169,13 @@ def _answer(root: Path, message: str, history: str) -> str:
     store = ChromaStore(config.data_dir() / "indexes" / repo_hash)
     profile = _active_profile()
     cag_blocks, cag_paths = _gather_cag(root)
-    hits = _dedup_hits(retrieve(store, embedder.embed, message, top_k=profile.rag_top_k), cag_paths)
-    prompt = assemble(message, cag_blocks=cag_blocks, rag_hits=hits, history=history)
+    hits = _dedup_hits(
+        retrieve(store, embedder.embed, message,
+                 top_k=profile.rag_top_k, rerank=profile.rerank),
+        cag_paths,
+    )
+    prompt = assemble(message, cag_blocks=cag_blocks, rag_hits=hits, history=history,
+                      max_context=profile.max_context_tokens)
     return generate(prompt)
 
 

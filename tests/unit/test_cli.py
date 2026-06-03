@@ -234,3 +234,27 @@ def test_agents_run_reports_per_task(tmp_path, monkeypatch):
     assert res.exit_code == 0, res.output
     assert "t1" in res.output
     assert "APPROVE" in res.output
+
+
+def test_chat_forwards_profile_rerank_and_max_context(tmp_path, monkeypatch):
+    import forge.assembler as _asm
+    import forge.retriever.retriever as _retr
+
+    monkeypatch.setattr(emb, "embed", lambda texts, **k: [[0.0, 1.0] for _ in texts])
+    monkeypatch.setattr(llm_mod, "generate", lambda prompt, **k: "OK")
+    cap = {}
+    monkeypatch.setattr(_retr, "retrieve",
+                        lambda store, embed_fn, q, **k: cap.update(retrieve_kw=k) or [])
+    monkeypatch.setattr(_asm, "assemble",
+                        lambda q, **k: cap.update(assemble_kw=k) or "PROMPT")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "a.py").write_text("def f():\n    return 1\n")
+    CliRunner().invoke(main, ["index", str(proj)])
+    CliRunner().invoke(main, ["chat", "--path", str(proj), "-m", "hi"])
+    # default profile (react-node): rerank True, top_k 6, max_context 65536 — all forwarded
+    assert cap["retrieve_kw"]["rerank"] is True
+    assert cap["retrieve_kw"]["top_k"] == 6
+    assert cap["assemble_kw"]["max_context"] == 65536
