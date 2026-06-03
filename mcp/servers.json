@@ -1,0 +1,56 @@
+{
+  "mcpServers": {
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@cyanheads/git-mcp-server"],
+      "description": "Local git ops — log, diff, branch, commit, stash, blame"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-github-token>" },
+      "description": "GitHub remote — PRs, issues, Actions, code search"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${workspaceFolder}"],
+      "description": "Scoped local filesystem access for the current workspace"
+    },
+    "jira": {
+      "command": "npx",
+      "args": ["-y", "mcp-atlassian"],
+      "env": {
+        "JIRA_URL": "<https://your-org.atlassian.net>",
+        "JIRA_USERNAME": "<your-email>",
+        "JIRA_API_TOKEN": "<your-api-token>"
+      },
+      "description": "Jira/Confluence — issues, sprints, ticket creation, commit linking"
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "description": "Up-to-date library docs injected into context at query time"
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "description": "Step-by-step reasoning on complex multi-part tasks"
+    },
+    "gcloud": {
+      "command": "npx",
+      "args": ["-y", "google-cloud-mcp"],
+      "env": { "GOOGLE_APPLICATION_CREDENTIALS": "<path-to-service-account.json>" },
+      "description": "GCP resource inspection, IAM, deployment context"
+    },
+    "firebase": {
+      "command": "npx",
+      "args": ["-y", "firebase-tools", "experimental:mcp"],
+      "description": "Firestore, Auth, Functions, Storage context (Firebase CLI MCP)"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"],
+      "description": "Browser automation and E2E test execution"
+    }
+  }
+}
