@@ -131,20 +131,30 @@ def _trim_history(history: str, max_tokens: int = 8000) -> str:
     return "".join(kept)
 
 
+def _active_profile():
+    from forge.profiles import ProfileError, load_profile
+    try:
+        return load_profile(config.load_active_profile())
+    except ProfileError:
+        return load_profile("react-node")
+
+
 def _gather_cag(root: Path) -> tuple[list[str], set[str]]:
     from forge.vault.loader import load_vault
 
+    profile = _active_profile()
     blocks: list[str] = []
     paths: set[str] = set()
-    for name in ("README.md", "package.json", "pyproject.toml", "tsconfig.json"):
+    for name in (*profile.static_files, *profile.static_gcp_files):
         f = root / name
         if f.is_file():
             text = f.read_text(encoding="utf-8", errors="replace")
             blocks.append(f"# {name}\n{text}")
             paths.add(str(f))
-    vault_block = load_vault(root)
-    if vault_block:
-        blocks.append(vault_block)
+    if profile.vault_enabled:
+        vault_block = load_vault(root, max_tokens=profile.vault_max_tokens)
+        if vault_block:
+            blocks.append(vault_block)
     return blocks, paths
 
 
@@ -157,8 +167,9 @@ def _answer(root: Path, message: str, history: str) -> str:
 
     repo_hash = hashlib.sha256(str(root).encode()).hexdigest()[:16]
     store = ChromaStore(config.data_dir() / "indexes" / repo_hash)
+    profile = _active_profile()
     cag_blocks, cag_paths = _gather_cag(root)
-    hits = _dedup_hits(retrieve(store, embedder.embed, message, top_k=6), cag_paths)
+    hits = _dedup_hits(retrieve(store, embedder.embed, message, top_k=profile.rag_top_k), cag_paths)
     prompt = assemble(message, cag_blocks=cag_blocks, rag_hits=hits, history=history)
     return generate(prompt)
 
@@ -295,6 +306,60 @@ def verify(path: str, out: str | None) -> None:
         console.print(f"Wrote verification bundle to {out}")
     else:
         console.print(text)
+
+
+@main.group()
+def profile() -> None:
+    """List or set the active stack profile."""
+
+
+@profile.command("list")
+def profile_list() -> None:
+    """List available stack profiles."""
+    from forge.profiles import list_profiles
+    active = config.load_active_profile()
+    for name in list_profiles():
+        mark = "[green]*[/]" if name == active else " "
+        console.print(f"{mark} {name}")
+
+
+@profile.command("set")
+@click.argument("name")
+def profile_set(name: str) -> None:
+    """Set the active stack profile."""
+    from forge.profiles import ProfileError, load_profile
+    try:
+        load_profile(name)
+    except ProfileError as exc:
+        raise click.ClickException(str(exc)) from exc
+    path = config.active_profile_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(name)
+    console.print(f"Active profile set to [bold]{name}[/].")
+
+
+@main.group()
+def agents() -> None:
+    """Run the multi-agent scaffold over a plan."""
+
+
+@agents.command("run")
+@click.argument("tasks_json", type=click.Path(exists=True, dir_okay=False))
+def agents_run(tasks_json: str) -> None:
+    """Code + review each task in a tasks.json with the local model (proposes only)."""
+    import forge.llm as _llm
+    from forge.agents.orchestrator import run_manifest
+    from forge.plan.manifest import ManifestError, load_manifest
+
+    try:
+        manifest = load_manifest(tasks_json)
+    except ManifestError as exc:
+        raise click.ClickException(str(exc)) from exc
+    for r in run_manifest(manifest, generate_fn=_llm.generate):
+        console.print(f"[bold]{r.task_id}[/] — {r.title}")
+        console.print(f"[dim]proposal:[/]\n{r.proposal}")
+        console.print(f"[dim]review:[/]\n{r.review}\n")
+    console.print("[yellow]Scaffold output — review proposals before applying.[/]")
 
 
 def _watch(root: Path, run) -> None:

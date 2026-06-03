@@ -6,6 +6,7 @@ from click.testing import CliRunner
 import forge.embedder.embedder as emb
 import forge.llm as llm_mod
 from forge.cli import main, _dedup_hits, _trim_history
+from forge import config as _config
 
 
 def _profile(tmp_path: Path) -> Path:
@@ -185,3 +186,51 @@ def test_verify_out_writes_file(tmp_path, monkeypatch):
     assert res.exit_code == 0, res.output
     assert out_file.exists()
     assert "feature.py" in out_file.read_text()
+
+
+def test_profile_list_and_set(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    r = CliRunner()
+    out = r.invoke(main, ["profile", "list"])
+    assert out.exit_code == 0
+    assert "react-node" in out.output and "fullstack-firebase" in out.output
+
+    out = r.invoke(main, ["profile", "set", "nextjs"])
+    assert out.exit_code == 0
+    assert _config.load_active_profile() == "nextjs"
+
+    out = r.invoke(main, ["profile", "set", "bogus"])
+    assert out.exit_code != 0  # unknown profile rejected
+
+
+def test_chat_uses_active_profile_static_files(tmp_path, monkeypatch):
+    # python-backend profile pulls pyproject.toml into CAG; prove it reaches the prompt
+    monkeypatch.setattr(emb, "embed", lambda texts, **k: [[0.0, 1.0] for _ in texts])
+    captured = {}
+    monkeypatch.setattr(llm_mod, "generate",
+                        lambda prompt, **k: captured.setdefault("p", prompt) or "OK")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    (tmp_path / "cfg" / "forge").mkdir(parents=True)
+    (tmp_path / "cfg" / "forge" / "active-profile").write_text("python-backend")
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "pyproject.toml").write_text("# MARKER-PYPROJECT\n")
+    (proj / "a.py").write_text("def f():\n    return 1\n")
+    CliRunner().invoke(main, ["index", str(proj)])
+    CliRunner().invoke(main, ["chat", "--path", str(proj), "-m", "hi"])
+    assert "MARKER-PYPROJECT" in captured["p"]
+
+
+def test_agents_run_reports_per_task(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm_mod, "generate",
+                        lambda prompt, **k: "REVIEW: APPROVE" if "reviewer" in prompt.lower()
+                        else "CODE: def f(): ...")
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(_json.dumps({"feature": "Demo", "tasks": [
+        {"id": "t1", "title": "first", "acceptance_criteria": ["x"]},
+    ]}))
+    res = CliRunner().invoke(main, ["agents", "run", str(tasks)])
+    assert res.exit_code == 0, res.output
+    assert "t1" in res.output
+    assert "APPROVE" in res.output
