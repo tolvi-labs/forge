@@ -28,4 +28,4 @@ def test_continue_config_has_context_and_mcp():
 def test_cursor_mcp_matches_canonical_shape():
     servers = json.loads(CURSOR_MCP.read_text())["mcpServers"]
     canonical = json.loads((REPO / "mcp" / "servers.json").read_text())["mcpServers"]
-    assert set(servers) == set(canonical)  # same server set as the Forge canonical
+    assert servers == canonical  # cursor mcp.json is a verbatim copy of the canonical

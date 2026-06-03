@@ -9,14 +9,14 @@ echo "⚒️  Forge — local AI dev environment"
 echo "────────────────────────────────────"
 
 # 1. Hardware detection
-echo "Step 1/6 — Detecting hardware..."
+echo "Step 1/7 — Detecting hardware..."
 bash "$REPO_DIR/setup/detect-hardware.sh"
 PROFILE="$CONFIG_DIR/hardware-profile.json"
 RECOMMENDED_MODEL=$(grep '"recommended_model"' "$PROFILE" | sed 's/.*: "\(.*\)".*/\1/')
 MAX_CONTEXT=$(grep '"max_context_tokens"' "$PROFILE" | sed 's/[^0-9]//g')
 
 # 2. Ollama
-echo "Step 2/6 — Checking Ollama..."
+echo "Step 2/7 — Checking Ollama..."
 if ! command -v ollama &>/dev/null; then
   if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &>/dev/null; then
     brew install ollama
@@ -29,13 +29,13 @@ if ! ollama list &>/dev/null; then
 fi
 
 # 3. Models
-echo "Step 3/6 — Pulling models (may take a while)..."
+echo "Step 3/7 — Pulling models (may take a while)..."
 ollama pull "$RECOMMENDED_MODEL"
 ollama pull qwen2.5-coder:7b
 ollama pull nomic-embed-text
 
 # 4. forge-coder Modelfile
-echo "Step 4/6 — Building forge-coder..."
+echo "Step 4/7 — Building forge-coder..."
 RENDERED="$CONFIG_DIR/Modelfile"
 sed -e "s|{{RECOMMENDED_MODEL}}|$RECOMMENDED_MODEL|g" \
     -e "s|{{MAX_CONTEXT}}|$MAX_CONTEXT|g" \
@@ -43,7 +43,7 @@ sed -e "s|{{RECOMMENDED_MODEL}}|$RECOMMENDED_MODEL|g" \
 ollama create forge-coder -f "$RENDERED"
 
 # 5. Python env (dedicated 3.12 venv — system Python is 3.14)
-echo "Step 5/6 — Installing Forge CLI into a Python 3.12 venv..."
+echo "Step 5/7 — Installing Forge CLI into a Python 3.12 venv..."
 if ! command -v uv &>/dev/null; then
   if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &>/dev/null; then
     brew install uv
