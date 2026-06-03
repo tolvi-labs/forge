@@ -55,9 +55,10 @@ class ChromaStore:
         res = self._col.query(query_embeddings=[embedding], n_results=top_k,
                               include=["metadatas", "documents", "distances"])
         hits: list[dict] = []
+        ids = res["ids"][0] if res["ids"] else []
         metas = res["metadatas"][0] if res["metadatas"] else []
         docs = res["documents"][0] if res["documents"] else []
         dists = res["distances"][0] if res["distances"] else []
-        for md, doc, dist in zip(metas, docs, dists):
-            hits.append({**md, "content": doc, "distance": dist})
+        for chunk_id, md, doc, dist in zip(ids, metas, docs, dists):
+            hits.append({**md, "chunk_id": chunk_id, "content": doc, "distance": dist})
         return hits

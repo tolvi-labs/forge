@@ -59,3 +59,10 @@ def test_replace_file_handles_same_line_chunks(tmp_path):
     c2 = _chunk("a.json", 1, '"b": 2')
     s.replace_file("a.json", "v1", [c1, c2], [[1.0, 0.0], [0.0, 1.0]])
     assert s.count() == 2
+
+
+def test_query_includes_chunk_id(tmp_path):
+    s = _store(tmp_path)
+    s.replace_file("a.py", "v1", [_chunk("a.py", 1, "alpha")], [[1.0, 0.0]])
+    hits = s.query([1.0, 0.0], top_k=1)
+    assert hits[0]["chunk_id"].startswith("a.py::1-1")
