@@ -1,0 +1,8 @@
+{
+  "static_files": ["package.json", "tsconfig.json", "next.config.js", "README.md", ".env.example", "tasks.json"],
+  "static_gcp_files": [],
+  "vault": { "enabled": true, "max_tokens": 6000 },
+  "rag_top_k": 6,
+  "rerank": true,
+  "max_context_tokens": 65536
+}

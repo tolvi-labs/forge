@@ -1,0 +1,8 @@
+{
+  "static_files": ["package.json", "tsconfig.json", "README.md", ".env.example", "tasks.json"],
+  "static_gcp_files": ["firebase.json", ".firebaserc", "firestore.rules", "firestore.indexes.json"],
+  "vault": { "enabled": true, "max_tokens": 6000 },
+  "rag_top_k": 8,
+  "rerank": true,
+  "max_context_tokens": 65536
+}
