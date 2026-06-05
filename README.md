@@ -49,12 +49,13 @@ Bootstrap writes the Continue config to `~/.continue/config.yaml` automatically.
 2. Open the Continue panel (sidebar) — it will pick up `~/.continue/config.yaml` on first load.
 3. Confirm Ollama is running (`ollama list` should show `forge-coder` and `qwen2.5-coder:7b`).
 
-The config wires three models automatically:
-- **Chat / Edit / Apply** → `forge-coder` (14b reasoning, long context)
+The config wires four models automatically:
+- **Chat / Edit / Apply** → `qwen2.5-coder:7b` (fast, best for everyday coding questions)
+- **Chat (Deep)** → `forge-coder` (14b, long context — switch to this for architecture or multi-file work)
 - **Autocomplete** → `qwen2.5-coder:7b` (fast, low-latency)
 - **Embeddings** → `nomic-embed-text`
 
-MCP servers (git, context7, sequential-thinking, playwright) are included with no credentials required. The full set (github, jira, gcloud, firebase) requires credentials — fill those in at `~/.config/forge/mcp/servers.json` and add the servers to your Continue config. See [`integrations/vscode/README.md`](./integrations/vscode/README.md) for details.
+MCP tool integrations (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright) are configured for Claude Code, not Continue.dev — see [`mcp/servers.json`](./mcp/servers.json). Wiring MCP servers into Continue.dev injects tool definitions that cause smaller models to emit tool-call JSON instead of answers.
 
 ## Quickstart
 
@@ -87,7 +88,7 @@ forge verify                        # export the diff + manifest for Claude to r
 - **Index** — Tree-sitter AST chunking across 9 languages (with a line-based fallback), local embeddings via `nomic-embed-text`, a ChromaDB store with file-checksum incremental re-indexing.
 - **Context** — a hybrid **CAG + RAG** window: stable always-on context (manifests, README, the Tolvi vault) plus the top semantically-relevant code chunks (hard-capped to avoid lost-in-the-middle), tuned per [stack profile](./src/forge/profiles_data).
 - **Workflow** — `tasks.json` is the Claude↔Forge handoff contract; Forge validates it, tracks completion, auto-commits per task, and exports a verifiable diff.
-- **Editors & tools** — Continue.dev (VS Code, primary) and Cursor against the same Ollama backend; a pre-wired, npm-verified [MCP layer](./mcp/servers.json) (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright).
+- **Editors & tools** — Continue.dev (VS Code, primary) and Cursor against the same Ollama backend; a pre-wired, npm-verified [MCP layer](./mcp/servers.json) (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright) configured for Claude Code.
 
 Everything runs locally — no code leaves the machine during execution. Architecture and design notes live in [`docs/`](./docs).
 
