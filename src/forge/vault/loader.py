@@ -6,6 +6,7 @@ format-only: Forge reads decisions/patterns a repo already keeps under
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from forge.chunker.chunk import count_tokens
@@ -64,7 +65,8 @@ def _read_doc(path: Path) -> dict | None:
 
 
 def load_vault(repo_root: str | Path, *, max_tokens: int = 6000) -> str | None:
-    vault = Path(repo_root) / "vault"
+    env_override = os.environ.get("FORGE_VAULT")
+    vault = Path(env_override) if env_override else Path(repo_root) / "vault"
     if not vault.is_dir():
         return None
 
