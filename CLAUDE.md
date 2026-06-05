@@ -17,5 +17,6 @@ Forge is a local-first AI dev environment, part of Tolvi Labs. Python core, Clic
 - `2026-06-01-standalone-config-and-python-core.md` — Standalone config and Python core
 - `2026-06-05-forge-vault-env-var-override.md` — FORGE_VAULT env var overrides default vault path
 - `2026-06-05-cli-path-via-local-bin-symlink.md` — CLI made available on PATH via ~/.local/bin symlink
+- `2026-06-05-watch-state-plumbing-design.md` — Three on-disk artifacts for forge watch TUI (phase, inference log, context fill)
 
 <!-- VAULT-INDEX:END -->

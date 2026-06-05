@@ -1,5 +1,4 @@
 import json
-import json as _json
 import subprocess as _sub
 from pathlib import Path
 from click.testing import CliRunner
@@ -136,7 +135,7 @@ def _tasks_file(path):
          "acceptance_criteria": ["y"]},
     ]}
     f = path / "tasks.json"
-    f.write_text(_json.dumps(data))
+    f.write_text(json.dumps(data))
     return f
 
 
@@ -227,7 +226,7 @@ def test_agents_run_reports_per_task(tmp_path, monkeypatch):
                         lambda prompt, **k: "REVIEW: APPROVE" if "reviewer" in prompt.lower()
                         else "CODE: def f(): ...")
     tasks = tmp_path / "tasks.json"
-    tasks.write_text(_json.dumps({"feature": "Demo", "tasks": [
+    tasks.write_text(json.dumps({"feature": "Demo", "tasks": [
         {"id": "t1", "title": "first", "acceptance_criteria": ["x"]},
     ]}))
     res = CliRunner().invoke(main, ["agents", "run", str(tasks)])
@@ -258,3 +257,30 @@ def test_chat_forwards_profile_rerank_and_max_context(tmp_path, monkeypatch):
     assert cap["retrieve_kw"]["rerank"] is True
     assert cap["retrieve_kw"]["top_k"] == 6
     assert cap["assemble_kw"]["max_context"] == 65536
+
+
+def test_make_inference_logger_appends_json_lines(tmp_path):
+    from forge.cli import _make_inference_logger
+    log = tmp_path / "inference.log"
+    logger = _make_inference_logger(log)
+    stats = {"model": "forge-coder", "tokens_out": 100, "tokens_in": 50,
+             "tokens_per_sec": 25.0, "duration_ms": 4000.0}
+    logger(stats)
+    logger(stats)
+    lines = log.read_text().splitlines()
+    assert len(lines) == 2
+    entry = json.loads(lines[0])
+    assert entry["model"] == "forge-coder"
+    assert entry["tokens_out"] == 100
+    assert "ts" in entry
+    import datetime as _dt
+    _dt.datetime.fromisoformat(entry["ts"])  # raises if not a valid ISO datetime
+
+
+def test_write_context_stats_creates_json_with_correct_fields(tmp_path):
+    from forge.cli import _write_context_stats
+    path = tmp_path / "context" / "abc123.json"
+    _write_context_stats(path, tokens_used=18000, tokens_budget=65536)
+    data = json.loads(path.read_text())
+    assert data["tokens_used"] == 18000
+    assert data["tokens_budget"] == 65536

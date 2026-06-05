@@ -1,6 +1,7 @@
 """Forge command-line interface."""
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import shutil
@@ -158,6 +159,25 @@ def _gather_cag(root: Path) -> tuple[list[str], set[str]]:
     return blocks, paths
 
 
+def _make_inference_logger(log_path: Path):
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    def _log(stats: dict) -> None:
+        entry = json.dumps(
+            {"ts": datetime.datetime.now(datetime.timezone.utc).isoformat(), **stats}
+        )
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(entry + "\n")
+    return _log
+
+
+def _write_context_stats(path: Path, *, tokens_used: int, tokens_budget: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"tokens_used": tokens_used, "tokens_budget": tokens_budget}),
+        encoding="utf-8",
+    )
+
+
 def _answer(root: Path, message: str, history: str) -> str:
     from forge.assembler import assemble
     from forge.embedder import embedder
@@ -176,7 +196,16 @@ def _answer(root: Path, message: str, history: str) -> str:
     )
     prompt = assemble(message, cag_blocks=cag_blocks, rag_hits=hits, history=history,
                       max_context=profile.max_context_tokens)
-    return generate(prompt)
+    from forge.chunker.chunk import count_tokens
+    _write_context_stats(
+        config.data_dir() / "context" / f"{repo_hash}.json",
+        tokens_used=count_tokens(prompt),
+        tokens_budget=profile.max_context_tokens,
+    )
+    return generate(
+        prompt,
+        stats_callback=_make_inference_logger(config.data_dir() / "inference.log"),
+    )
 
 
 @main.command()
