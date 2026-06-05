@@ -63,6 +63,7 @@ echo "   forge -> $HOME/.local/bin/forge"
 SHELL_RC="$HOME/.zshrc"
 if [[ "$(basename "$SHELL")" == "bash" ]]; then SHELL_RC="$HOME/.bashrc"; fi
 if ! grep -q 'local/bin' "$SHELL_RC" 2>/dev/null; then
+  # shellcheck disable=SC2016
   echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
   echo "   Added ~/.local/bin to PATH in $SHELL_RC (restart shell or: source $SHELL_RC)"
 fi
