@@ -71,3 +71,19 @@ def test_load_vault_tolerates_leading_blank_line(tmp_path):
         "\n---\nstatus: draft\n---\n\n## Why\nleaks-through\n",
     )
     assert load_vault(repo) is None
+
+
+def test_forge_vault_env_var_overrides_repo_root(tmp_path, monkeypatch):
+    # An external vault pointed to by FORGE_VAULT is used even when the repo
+    # has no vault/ directory of its own.
+    external_vault = tmp_path / "external-vault"
+    (external_vault / "decisions").mkdir(parents=True)
+    (external_vault / "decisions" / "external-decision.md").write_text(
+        "---\nstatus: active\n---\n\nexternal-vault-content\n"
+    )
+    monkeypatch.setenv("FORGE_VAULT", str(external_vault))
+    repo_without_vault = tmp_path / "repo"
+    repo_without_vault.mkdir()
+    block = load_vault(repo_without_vault)
+    assert block is not None
+    assert "external-vault-content" in block

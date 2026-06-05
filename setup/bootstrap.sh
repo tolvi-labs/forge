@@ -56,6 +56,16 @@ uv venv --python 3.12 "$REPO_DIR/.venv"
 # shellcheck disable=SC1091
 source "$REPO_DIR/.venv/bin/activate"
 uv pip install -e "$REPO_DIR"
+mkdir -p "$HOME/.local/bin"
+ln -sf "$REPO_DIR/.venv/bin/forge" "$HOME/.local/bin/forge"
+echo "   forge -> $HOME/.local/bin/forge"
+# Add ~/.local/bin to PATH in shell profile if not already present
+SHELL_RC="$HOME/.zshrc"
+if [[ "$(basename "$SHELL")" == "bash" ]]; then SHELL_RC="$HOME/.bashrc"; fi
+if ! grep -q 'local/bin' "$SHELL_RC" 2>/dev/null; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
+  echo "   Added ~/.local/bin to PATH in $SHELL_RC (restart shell or: source $SHELL_RC)"
+fi
 
 # 6. Editor + MCP configs
 echo "Step 6/7 — Installing editor + MCP configs..."
@@ -71,7 +81,7 @@ echo "────────────────────────�
 echo "   Model        : forge-coder ($RECOMMENDED_MODEL)"
 echo "   Context      : $MAX_CONTEXT tokens"
 echo "   Config       : $CONFIG_DIR"
-echo "   CLI          : activate with 'source $REPO_DIR/.venv/bin/activate', then 'forge status'"
+echo "   CLI          : forge status"
 echo ""
 echo "   Editors      : Continue config installed; see integrations/cursor for Cursor"
 echo "   Next         : add MCP credentials in $CONFIG_DIR/mcp/servers.json, then 'forge index .'"
