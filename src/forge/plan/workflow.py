@@ -77,7 +77,8 @@ def complete(repo: Path, plan_dir: Path, task_id: str, title: str) -> None:
 
 def verify(repo: Path, plan_dir: Path) -> dict:
     state = read_state(plan_dir)
-    write_phase(plan_dir, "verifying")
+    if read_phase(plan_dir) != "done":
+        write_phase(plan_dir, "verifying")
     baseline = state["baseline"]
     diff = _git(repo, "diff", baseline)
     manifest = json.loads((plan_dir / "manifest.json").read_text(encoding="utf-8"))
