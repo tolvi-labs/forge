@@ -104,3 +104,17 @@ def test_read_phase_returns_none_when_absent(tmp_path):
     pdir = tmp_path / "plandir"
     pdir.mkdir()
     assert workflow.read_phase(pdir) is None
+
+
+def test_verify_does_not_overwrite_done_phase(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    m = _manifest(tmp_path)
+    workflow.load_plan(repo, pdir, m)
+    # complete all tasks so phase becomes "done"
+    workflow.complete(repo, pdir, "task-001", "first")
+    # manually write "done" phase as plan_complete CLI would
+    workflow.write_phase(pdir, "done")
+    # verify should not overwrite "done"
+    workflow.verify(repo, pdir)
+    assert workflow.read_phase(pdir) == "done"
