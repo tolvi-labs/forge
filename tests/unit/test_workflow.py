@@ -83,3 +83,24 @@ def test_load_plan_on_non_git_dir_raises(tmp_path):
     not_a_repo.mkdir()
     with pytest.raises(RuntimeError):
         workflow.load_plan(not_a_repo, tmp_path / "pd", _manifest(tmp_path))
+
+
+def test_load_plan_writes_phase_executing(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    workflow.load_plan(repo, pdir, _manifest(tmp_path))
+    assert workflow.read_phase(pdir) == "executing"
+
+
+def test_verify_writes_phase_verifying(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    workflow.load_plan(repo, pdir, _manifest(tmp_path))
+    workflow.verify(repo, pdir)
+    assert workflow.read_phase(pdir) == "verifying"
+
+
+def test_read_phase_returns_none_when_absent(tmp_path):
+    pdir = tmp_path / "plandir"
+    pdir.mkdir()
+    assert workflow.read_phase(pdir) is None

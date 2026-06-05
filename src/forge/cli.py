@@ -256,7 +256,7 @@ def plan_next(path: str) -> None:
 def plan_complete(task_id: str, path: str) -> None:
     """Mark a task done and auto-commit its changes."""
     from forge.plan.manifest import Manifest
-    from forge.plan.workflow import complete, read_state
+    from forge.plan.workflow import complete, read_state, write_phase
 
     root = Path(path).resolve()
     pdir = _plan_dir(root)
@@ -266,6 +266,8 @@ def plan_complete(task_id: str, path: str) -> None:
         raise click.ClickException(f"No such task: {task_id}")
     complete(root, pdir, task_id, task.title)
     done = len(read_state(pdir)["completed"])
+    if done == len(manifest.tasks):
+        write_phase(pdir, "done")
     console.print(f"Completed [bold]{task_id}[/] ({done}/{len(manifest.tasks)}).")
 
 

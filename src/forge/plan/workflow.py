@@ -29,6 +29,21 @@ def write_state(plan_dir: Path, state: dict) -> None:
     _state_path(plan_dir).write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
+def _phase_path(plan_dir: Path) -> Path:
+    return plan_dir / "phase.json"
+
+
+def write_phase(plan_dir: Path, phase: str) -> None:
+    _phase_path(plan_dir).write_text(json.dumps({"phase": phase}), encoding="utf-8")
+
+
+def read_phase(plan_dir: Path) -> str | None:
+    p = _phase_path(plan_dir)
+    if not p.exists():
+        return None
+    return json.loads(p.read_text(encoding="utf-8")).get("phase")
+
+
 def load_plan(repo: Path, plan_dir: Path, manifest: Manifest) -> None:
     plan_dir.mkdir(parents=True, exist_ok=True)
     baseline = _git(repo, "rev-parse", "HEAD").strip()
@@ -46,6 +61,7 @@ def load_plan(repo: Path, plan_dir: Path, manifest: Manifest) -> None:
         encoding="utf-8",
     )
     write_state(plan_dir, {"baseline": baseline, "completed": []})
+    write_phase(plan_dir, "executing")
 
 
 def complete(repo: Path, plan_dir: Path, task_id: str, title: str) -> None:
@@ -61,6 +77,7 @@ def complete(repo: Path, plan_dir: Path, task_id: str, title: str) -> None:
 
 def verify(repo: Path, plan_dir: Path) -> dict:
     state = read_state(plan_dir)
+    write_phase(plan_dir, "verifying")
     baseline = state["baseline"]
     diff = _git(repo, "diff", baseline)
     manifest = json.loads((plan_dir / "manifest.json").read_text(encoding="utf-8"))
