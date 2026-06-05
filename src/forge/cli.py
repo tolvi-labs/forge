@@ -344,6 +344,13 @@ def verify(path: str, out: str | None) -> None:
         console.print(text)
 
 
+@main.command()
+def watch() -> None:
+    """Live dashboard for active forge plans."""
+    from forge.watch import run_watch
+    run_watch(config.data_dir())
+
+
 @main.group()
 def profile() -> None:
     """List or set the active stack profile."""

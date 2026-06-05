@@ -284,3 +284,9 @@ def test_write_context_stats_creates_json_with_correct_fields(tmp_path):
     data = json.loads(path.read_text())
     assert data["tokens_used"] == 18000
     assert data["tokens_budget"] == 65536
+
+
+def test_watch_command_exists():
+    result = CliRunner().invoke(main, ["watch", "--help"])
+    assert result.exit_code == 0
+    assert "dashboard" in result.output.lower()
