@@ -7,7 +7,6 @@ import sys
 import termios
 import threading
 import time
-import tty
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -292,8 +291,20 @@ class KeyboardHandler:
         except termios.error:
             self._stop.set()  # stdin is not a TTY; disable keyboard navigation
             return
+        # Apply raw input mode without clearing OPOST. tty.setraw() also clears
+        # OPOST which disables output processing on the shared terminal device,
+        # breaking Rich Live's ANSI cursor-repositioning sequences.
+        new = list(old)
+        new[6] = list(old[6])
+        new[0] &= ~(termios.BRKINT | termios.ICRNL | termios.INPCK | termios.ISTRIP | termios.IXON)
+        # new[1] (oflag): leave OPOST intact — tty.setraw clears it, which breaks Rich Live
+        new[2] &= ~(termios.CSIZE | termios.PARENB)
+        new[2] |= termios.CS8
+        new[3] &= ~(termios.ECHO | termios.ICANON | termios.IEXTEN | termios.ISIG)
+        new[6][termios.VMIN] = 1
+        new[6][termios.VTIME] = 0
         try:
-            tty.setraw(fd)
+            termios.tcsetattr(fd, termios.TCSAFLUSH, new)
             while not self._stop.is_set():
                 r, _, _ = select.select([sys.stdin], [], [], 0.1)
                 if not r:
