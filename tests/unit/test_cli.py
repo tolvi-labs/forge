@@ -290,3 +290,15 @@ def test_watch_command_exists():
     result = CliRunner().invoke(main, ["watch", "--help"])
     assert result.exit_code == 0
     assert "dashboard" in result.output.lower()
+
+
+def test_start_command_exists():
+    result = CliRunner().invoke(main, ["start", "--help"])
+    assert result.exit_code == 0
+    assert "ollama" in result.output.lower()
+
+
+def test_stop_command_exists():
+    result = CliRunner().invoke(main, ["stop", "--help"])
+    assert result.exit_code == 0
+    assert "ollama" in result.output.lower()
