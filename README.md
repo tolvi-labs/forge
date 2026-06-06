@@ -37,9 +37,11 @@ bash setup/bootstrap.sh
 The installer detects your hardware, pulls the right Ollama models, builds the `forge-coder` model, installs the CLI into a dedicated Python 3.12 venv, writes the Continue.dev + MCP configs, and symlinks `forge` into `~/.local/bin` (adding it to `PATH` in your shell profile if needed). Open a new terminal after bootstrap, then:
 
 ```bash
-forge status    # verify everything is wired up
+forge start     # bring Ollama up, ensure models + forge-coder, then print status
 forge doctor    # diagnose any missing pieces
 ```
+
+`forge start` is also the command to use after a reboot or in a fresh shell — it starts Ollama in the background and leaves it running. `forge stop` shuts down that server (only if Forge started it).
 
 ## VS Code (Continue.dev)
 
@@ -75,8 +77,10 @@ forge verify                        # export the diff + manifest for Claude to r
 
 | Command | What it does |
 |---|---|
+| `forge start` / `stop` | Bring Ollama up + ensure models/`forge-coder` then show status; stop the server (only if Forge started it) |
 | `forge status` / `doctor` | Active model/context/profile; environment diagnostics |
 | `forge index [--watch]` | Tree-sitter chunk + embed a repo into a local ChromaDB index |
+| `forge watch` | Live TUI dashboard: auto-discovers active plans, loop phase, inference rate, context fill |
 | `forge search` / `chat` | Semantic retrieval; chat with CAG+RAG context (Tolvi vault included) |
 | `forge plan load/next/complete/status` | Drive a Claude `tasks.json` in dependency order, auto-committing per task |
 | `forge verify` | Export the diff since plan baseline + manifest for Claude's review |
