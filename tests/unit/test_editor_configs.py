@@ -18,9 +18,11 @@ def test_continue_config_routes_ollama_models():
     assert "schema: v1" in text
 
 
-def test_continue_config_has_context_and_mcp():
+def test_continue_config_has_context_and_no_mcp():
     text = CONTINUE.read_text()
-    assert "mcpServers" in text
+    # MCP servers belong in Claude Code, not Continue.dev — they only pollute
+    # the model's context here and provoke hallucinated tool-call responses.
+    assert "mcpServers" not in text
     for prov in ("code", "diff", "folder"):
         assert prov in text
 

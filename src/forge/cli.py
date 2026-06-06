@@ -22,9 +22,8 @@ def main() -> None:
     """Forge — local-first AI development environment."""
 
 
-@main.command()
-def status() -> None:
-    """Show the active model, context limit, and stack profile."""
+def _render_status() -> None:
+    """Print the active model, context limit, and stack profile."""
     profile_name = config.load_active_profile()
     try:
         hp = config.load_hardware_profile()
@@ -36,6 +35,46 @@ def status() -> None:
     console.print(f"Autocomplete   : {hp.autocomplete_model}")
     console.print(f"Context limit  : {hp.max_context_tokens} tokens")
     console.print(f"Active profile : {profile_name}")
+
+
+@main.command()
+def status() -> None:
+    """Show the active model, context limit, and stack profile."""
+    _render_status()
+
+
+@main.command()
+def start() -> None:
+    """Start Ollama, ensure models and forge-coder, then show status."""
+    from forge import runtime
+
+    try:
+        hp = config.load_hardware_profile()
+    except FileNotFoundError:
+        console.print("[yellow]Hardware profile not detected.[/] Run setup/detect-hardware.sh.")
+        raise SystemExit(1)
+
+    def event(msg: str) -> None:
+        console.print(f"  {msg}")
+
+    try:
+        runtime.ensure_ollama(on_event=event)
+        runtime.ensure_models(hp, on_event=event)
+        runtime.ensure_forge_coder(hp, on_event=event)
+    except RuntimeError as exc:
+        console.print(f"[red]✗[/] {exc}")
+        raise SystemExit(1)
+
+    console.print()
+    _render_status()
+
+
+@main.command()
+def stop() -> None:
+    """Stop the Ollama server, only if forge started it."""
+    from forge import runtime
+
+    runtime.stop_ollama(on_event=lambda msg: console.print(f"  {msg}"))
 
 
 def _check(label: str, ok: bool, detail: str = "") -> None:
