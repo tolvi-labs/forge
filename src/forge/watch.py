@@ -343,12 +343,16 @@ class KeyboardHandler:
 
 def run_watch(data_dir: Path) -> None:
     """Start the live watch dashboard. Blocks until Ctrl-C."""
+    from rich.console import Console
     from rich.live import Live
+
+    console = Console()
+    console.clear()
 
     kb = KeyboardHandler(tab_count=1)
     kb.start()
     try:
-        with Live(refresh_per_second=2) as live:
+        with Live(console=console, refresh_per_second=2) as live:
             while not kb.was_stopped():
                 sessions = discover_repos(data_dir)
                 kb.update_tab_count(max(1, len(sessions)))
