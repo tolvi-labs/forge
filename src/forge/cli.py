@@ -40,6 +40,7 @@ def _render_status() -> None:
 @main.command()
 def status() -> None:
     """Show the active model, context limit, and stack profile."""
+    console.clear()
     _render_status()
 
 
