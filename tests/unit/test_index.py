@@ -42,6 +42,25 @@ def test_reindex_skips_unchanged_and_picks_up_changes(tmp_path):
     assert stats3.files_indexed == 1 and stats3.files_skipped == 1
 
 
+def test_index_continues_when_a_file_fails_to_embed(tmp_path):
+    # One file that raises during embedding must not abort the whole index run;
+    # it is counted as failed and the other files still land.
+    root = _repo(tmp_path)
+    store = ChromaStore(tmp_path / "idx")
+
+    def flaky_embed(texts):
+        if any("bar" in t for t in texts):
+            raise RuntimeError("embed boom")
+        return fake_embed(texts)
+
+    stats = index_repo(root, store, flaky_embed)
+    files = set(store.indexed_files())
+    assert any(f.endswith("src/a.py") for f in files)
+    assert not any(f.endswith("src/b.py") for f in files)
+    assert stats.files_indexed == 1
+    assert stats.files_failed == 1
+
+
 def test_reindex_prunes_deleted_files(tmp_path):
     root = _repo(tmp_path)
     store = ChromaStore(tmp_path / "idx")
