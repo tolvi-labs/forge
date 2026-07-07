@@ -29,17 +29,25 @@ Add it to your shell profile or a per-project `.envrc` (via [direnv](https://dir
 
 ## Install
 
+Install the CLI from PyPI or Homebrew, then bring up the local models:
+
+```bash
+pip install tolvi-forge
+# or, on macOS/Linux via Homebrew:
+brew install tolvi-labs/tap/tolvi-forge
+
+forge start     # pulls the Ollama models and builds forge-coder on first run
+forge doctor    # diagnose any missing pieces
+```
+
+For a fully guided setup — hardware detection, model pulls, and the Continue.dev + MCP editor configs written for you — install from source:
+
 ```bash
 git clone https://github.com/tolvi-labs/forge && cd forge
 bash setup/bootstrap.sh
 ```
 
-The installer detects your hardware, pulls the right Ollama models, builds the `forge-coder` model, installs the CLI into a dedicated Python 3.12 venv, writes the Continue.dev + MCP configs, and symlinks `forge` into `~/.local/bin` (adding it to `PATH` in your shell profile if needed). Open a new terminal after bootstrap, then:
-
-```bash
-forge start     # bring Ollama up, ensure models + forge-coder, then print status
-forge doctor    # diagnose any missing pieces
-```
+The installer detects your hardware, pulls the right Ollama models, builds the `forge-coder` model, installs the CLI into a dedicated Python 3.12 venv, writes the Continue.dev + MCP configs, and symlinks `forge` into `~/.local/bin` (adding it to `PATH` in your shell profile if needed).
 
 `forge start` is also the command to use after a reboot or in a fresh shell — it starts Ollama in the background and leaves it running. `forge stop` shuts down that server (only if Forge started it).
 
