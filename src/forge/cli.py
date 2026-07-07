@@ -183,7 +183,8 @@ def _active_profile():
         return load_profile("react-node")
 
 
-def _gather_cag(root: Path) -> tuple[list[str], set[str]]:
+def _gather_cag(root: Path, query: str | None = None) -> tuple[list[str], set[str]]:
+    from forge.embedder import embedder
     from forge.vault.loader import load_vault
 
     profile = _active_profile()
@@ -196,7 +197,11 @@ def _gather_cag(root: Path) -> tuple[list[str], set[str]]:
             blocks.append(f"# {name}\n{text}")
             paths.add(str(f))
     if profile.vault_enabled:
-        vault_block = load_vault(root, max_tokens=profile.vault_max_tokens)
+        vault_block = load_vault(
+            root, max_tokens=profile.vault_max_tokens,
+            query=query, embed_fn=embedder.embed,
+            core_recent_n=profile.vault_core_recent,
+        )
         if vault_block:
             blocks.append(vault_block)
     return blocks, paths
@@ -231,7 +236,7 @@ def _answer(root: Path, message: str, history: str) -> str:
     repo_hash = hashlib.sha256(str(root).encode()).hexdigest()[:16]
     store = ChromaStore(config.data_dir() / "indexes" / repo_hash)
     profile = _active_profile()
-    cag_blocks, cag_paths = _gather_cag(root)
+    cag_blocks, cag_paths = _gather_cag(root, query=message)
     hits = _dedup_hits(
         retrieve(store, embedder.embed, message,
                  top_k=profile.rag_top_k, rerank=profile.rerank),

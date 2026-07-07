@@ -19,6 +19,7 @@ class Profile:
     static_gcp_files: list[str]
     vault_enabled: bool
     vault_max_tokens: int
+    vault_core_recent: int
     rag_top_k: int
     rerank: bool
     max_context_tokens: int
@@ -44,6 +45,7 @@ def load_profile(name: str) -> Profile:
         static_gcp_files=list(data.get("static_gcp_files", [])),
         vault_enabled=bool(vault.get("enabled", True)),
         vault_max_tokens=int(vault.get("max_tokens", 6000)),
+        vault_core_recent=int(vault.get("core_recent", 3)),
         rag_top_k=int(data.get("rag_top_k", 6)),
         rerank=bool(data.get("rerank", True)),
         max_context_tokens=int(data.get("max_context_tokens", 65536)),
