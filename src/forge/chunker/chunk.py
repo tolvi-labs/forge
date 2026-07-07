@@ -13,6 +13,16 @@ def count_tokens(text: str) -> int:
     return len(_ENC.encode(text, disallowed_special=()))
 
 
+def truncate_to_tokens(text: str, max_tokens: int) -> str:
+    """Trim text to at most max_tokens (cl100k). Used to keep embedder inputs
+    under the embedding model's context window so a single oversized chunk (a
+    lockfile, a minified bundle) can't 400 the whole index run."""
+    toks = _ENC.encode(text, disallowed_special=())
+    if len(toks) <= max_tokens:
+        return text
+    return _ENC.decode(toks[:max_tokens])
+
+
 def checksum(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 

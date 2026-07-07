@@ -116,11 +116,14 @@ def index(path: str, watch: bool) -> None:
 
     def run() -> None:
         stats = index_repo(root, store, embedder.embed)
-        console.print(
+        summary = (
             f"Indexed {stats.files_indexed} file(s) "
             f"({stats.chunks_written} chunks), skipped {stats.files_skipped}, "
-            f"pruned {stats.files_pruned}."
+            f"pruned {stats.files_pruned}"
         )
+        if stats.files_failed:
+            summary += f", failed {stats.files_failed}"
+        console.print(summary + ".")
 
     run()
     if watch:

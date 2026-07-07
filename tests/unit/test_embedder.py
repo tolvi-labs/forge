@@ -24,3 +24,21 @@ def test_embed_empty_returns_empty(monkeypatch):
         raise AssertionError("should not POST for empty input")
     monkeypatch.setattr(httpx, "post", boom)
     assert embed([]) == []
+
+
+def test_embed_truncates_oversized_input(monkeypatch):
+    # A chunk larger than the embedding model's context (e.g. a lockfile) must be
+    # trimmed before the POST so Ollama never 400s on "input length exceeds context".
+    from forge.chunker.chunk import count_tokens
+
+    captured = {}
+
+    def fake_post(url, json, timeout):
+        captured["input"] = json["input"]
+        return httpx.Response(200, json={"embeddings": [[0.0]]})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    huge = "lorem ipsum dolor sit amet " * 20000  # ~100k tokens
+    embed([huge])
+    assert len(captured["input"]) == 1
+    assert count_tokens(captured["input"][0]) <= 2048

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -9,6 +10,8 @@ from typing import Callable
 import pathspec
 
 from forge.chunker import chunk_file, detect_language
+
+log = logging.getLogger(__name__)
 
 EmbedFn = Callable[[list[str]], list[list[float]]]
 
@@ -21,6 +24,7 @@ class IndexStats:
     files_indexed: int = 0
     files_skipped: int = 0
     files_pruned: int = 0
+    files_failed: int = 0
     chunks_written: int = 0
 
 
@@ -66,8 +70,15 @@ def index_repo(root: str | Path, store, embed_fn: EmbedFn) -> IndexStats:
             stats.files_skipped += 1
             continue
         chunks = chunk_file(path)
-        embeddings = embed_fn([c.content for c in chunks]) if chunks else []
-        store.replace_file(fp, checksum, chunks, embeddings)
+        try:
+            embeddings = embed_fn([c.content for c in chunks]) if chunks else []
+            store.replace_file(fp, checksum, chunks, embeddings)
+        except Exception as e:
+            # One unindexable file (embed failure, transient store error) must not
+            # abort the whole run — record it and move on so re-index can retry it.
+            stats.files_failed += 1
+            log.warning("skipping %s: %s", fp, e)
+            continue
         stats.files_indexed += 1
         stats.chunks_written += len(chunks)
 
