@@ -1,9 +1,9 @@
 """Tree-sitter AST chunking across the supported grammars.
 
-Written against the tree-sitter-language-pack binding: parse() takes str;
-root_node(), kind(), named_child(), named_child_count(), child_by_field_name(),
-start_byte()/end_byte(), start_position()/end_position() are all METHOD calls;
-there is no node.text.
+Written against the modern py-tree-sitter API (>= 0.23, as pinned in pyproject):
+Parser.parse() takes bytes; Tree.root_node, Node.type, Node.named_children,
+Node.start_byte/end_byte, and Node.start_point/end_point are all attributes
+(properties). Node.child_by_field_name() is a method.
 """
 from __future__ import annotations
 
@@ -31,9 +31,8 @@ _CHUNK_NODES: dict[str, dict[str, str]] = {
 
 
 def _collect(node, targets: dict[str, str], out: list) -> None:
-    for i in range(node.named_child_count()):
-        child = node.named_child(i)
-        if child.kind() in targets:
+    for child in node.named_children:
+        if child.type in targets:
             out.append(child)
         else:
             _collect(child, targets, out)
@@ -42,10 +41,11 @@ def _collect(node, targets: dict[str, str], out: list) -> None:
 def _symbol(node, data: bytes) -> str:
     name = node.child_by_field_name("name")
     if name is not None:
-        return data[name.start_byte():name.end_byte()].decode("utf-8", "replace")
-    if node.named_child_count():
-        first = node.named_child(0)
-        text = data[first.start_byte():first.end_byte()].decode("utf-8", "replace").strip()
+        return data[name.start_byte:name.end_byte].decode("utf-8", "replace")
+    kids = node.named_children
+    if kids:
+        first = kids[0]
+        text = data[first.start_byte:first.end_byte].decode("utf-8", "replace").strip()
         if text:
             return text.splitlines()[0][:60]
     return "<anonymous>"
@@ -54,20 +54,20 @@ def _symbol(node, data: bytes) -> str:
 def chunk_source(source: str, *, language: str, file_path: str) -> list[Chunk]:
     targets = _CHUNK_NODES.get(language, {})
     data = source.encode("utf-8")
-    tree = get_parser(language).parse(source)
-    root = tree.root_node()
+    tree = get_parser(language).parse(data)
+    root = tree.root_node
 
     nodes: list = []
     _collect(root, targets, nodes)
 
     chunks: list[Chunk] = []
     for node in nodes:
-        content = data[node.start_byte():node.end_byte()].decode("utf-8", "replace")
+        content = data[node.start_byte:node.end_byte].decode("utf-8", "replace")
         chunks.append(Chunk.make(
             file_path=file_path, language=language,
-            chunk_type=targets[node.kind()], symbol_name=_symbol(node, data),
-            start_line=node.start_position().row + 1,
-            end_line=node.end_position().row + 1, content=content,
+            chunk_type=targets[node.type], symbol_name=_symbol(node, data),
+            start_line=node.start_point.row + 1,
+            end_line=node.end_point.row + 1, content=content,
         ))
 
     if not chunks:
