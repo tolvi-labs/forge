@@ -29,4 +29,4 @@ Forge's ship decision hinges on whether the local model is actually good enough 
 
 ## Outcome
 
-The dogfooding loop can emit acceptance, churn, token, and trust numbers per task and pooled across the whole period without manual bookkeeping, so the ship gate becomes a measured threshold instead of a judgment call; the harness itself is mid-build (outcomes IO and metric computation landed, the CLI commands pending).
+The dogfooding loop can emit acceptance, churn, token, and trust numbers per task and pooled across the whole period without manual bookkeeping, so the ship gate becomes a measured threshold instead of a judgment call; the harness is complete (`forge outcome` and `forge report` shipped, 162 tests passing) and ready to run against real dogfooding.

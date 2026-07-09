@@ -393,6 +393,110 @@ def verify(path: str, out: str | None) -> None:
 
 
 @main.command()
+@click.argument("task_id")
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+def outcome(task_id: str, path: str) -> None:
+    """Record a completed task's outcome for dogfooding metrics.
+
+    Run this right after you review and fix the task, before `plan next`, so the only working-tree delta on the task's files is your rework.
+    """
+    from forge.plan.manifest import Manifest
+    from forge.plan.outcomes import compute_task_metrics, read_outcomes, upsert_outcome
+    from forge.plan.workflow import read_state
+
+    root = Path(path).resolve()
+    pdir = _plan_dir(root)
+    manifest = Manifest.from_dict(json.loads((pdir / "manifest.json").read_text()))
+    task = manifest.task(task_id)
+    if task is None:
+        raise click.ClickException(f"No such task: {task_id}")
+    if task_id not in set(read_state(pdir)["completed"]):
+        raise click.ClickException(
+            f"Task {task_id} is not completed yet; run `forge plan complete {task_id}` first.")
+    if any(r["task_id"] == task_id for r in read_outcomes(pdir)) and not click.confirm(
+            f"{task_id} already has an outcome; overwrite?"):
+        return
+
+    metrics = compute_task_metrics(root, task, config.data_dir() / "inference.log")
+    if metrics["commit"] is None:
+        console.print(f"[yellow]No commit found for {task_id}[/] (no-op task); recording zeroed metrics.")
+    else:
+        console.print(f"rework churn : {metrics['rework_lines']} / {metrics['produced_lines']} lines "
+                      f"({metrics['churn'] * 100:.1f}%)  [auto]")
+        console.print(f"local tokens : {metrics['local_tokens']} @ "
+                      f"{metrics['tokens_per_sec']:.0f} tok/s  [auto]")
+
+    accepted = click.prompt("accepted",
+                            type=click.Choice(["clean", "minor", "rework", "rejected"]))
+    trust = click.prompt("trust (1-5)", type=click.IntRange(1, 5))
+    ttype = click.prompt("type",
+                         type=click.Choice(["bugfix", "feature", "refactor", "test", "config", "other"]))
+    reason = "" if accepted == "clean" else click.prompt(
+        "failure reason", default="", show_default=False)
+
+    upsert_outcome(pdir, {
+        "task_id": task.id,
+        "type": ttype,
+        "title": task.title,
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "commit": metrics["commit"],
+        "produced_lines": metrics["produced_lines"],
+        "rework_lines": metrics["rework_lines"],
+        "churn": metrics["churn"],
+        "local_tokens": metrics["local_tokens"],
+        "duration_ms": metrics["duration_ms"],
+        "tokens_per_sec": metrics["tokens_per_sec"],
+        "accepted": accepted,
+        "trust": trust,
+        "failure_reason": reason,
+    })
+    console.print(f"[green]Recorded outcome for {task_id}.[/]")
+
+
+@main.command()
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".")
+@click.option("--all", "all_plans", is_flag=True,
+              help="Pool outcomes across every plan (and repo) instead of just this one.")
+def report(path: str, all_plans: bool) -> None:
+    """Summarize dogfooding outcomes: acceptance rate, churn, tokens, trust."""
+    from rich.panel import Panel
+
+    from forge.plan.outcomes import aggregate, read_outcomes
+
+    if all_plans:
+        records: list[dict] = []
+        for plan_dir in sorted((config.data_dir() / "plans").glob("*")):
+            records.extend(read_outcomes(plan_dir))
+    else:
+        records = read_outcomes(_plan_dir(Path(path).resolve()))
+
+    if not records:
+        console.print("No outcomes recorded yet. Run `forge outcome <task_id>` "
+                      "after completing tasks.")
+        return
+
+    agg = aggregate(records)
+    lines = [
+        f"[bold]acceptance[/]  {agg['accepted_rate'] * 100:.0f}%  "
+        f"({agg['accepted']}/{agg['total']} tasks)   clean-only {agg['clean_rate'] * 100:.0f}%",
+        "by type: " + " | ".join(
+            f"{t} {b['rate'] * 100:.0f}%" for t, b in sorted(agg["by_type"].items())),
+        f"rework churn (median)  {agg['median_churn'] * 100:.1f}%",
+        f"local tokens  {agg['local_tokens']:,} @ {agg['mean_tokens_per_sec']:.0f} tok/s",
+        f"trust (mean)  {agg['mean_trust']:.1f} / 5",
+    ]
+    if agg["failure_reasons"]:
+        tally = ", ".join(f"{reason} ×{n}" for reason, n in sorted(
+            agg["failure_reasons"].items(), key=lambda kv: -kv[1]))
+        lines.append(f"failures: {tally}")
+    if all_plans:
+        lines.append("[dim]caveat: concurrent plans share one inference.log; "
+                     "token attribution can cross plans.[/]")
+    title = "forge report — all plans" if all_plans else "forge report"
+    console.print(Panel("\n".join(lines), title=title))
+
+
+@main.command()
 def watch() -> None:
     """Live dashboard for active forge plans."""
     from forge.watch import run_watch

@@ -97,3 +97,36 @@ def test_upsert_replaces_same_task_id(tmp_path):
     recs = outcomes.read_outcomes(tmp_path)
     assert len(recs) == 1
     assert recs[0]["trust"] == 1
+
+
+def _rec(task_id, ttype, accepted, trust, churn, tokens, reason=""):
+    return {"task_id": task_id, "type": ttype, "accepted": accepted, "trust": trust,
+            "churn": churn, "local_tokens": tokens, "tokens_per_sec": 40.0,
+            "failure_reason": reason}
+
+
+def test_aggregate_empty_is_safe():
+    agg = outcomes.aggregate([])
+    assert agg["total"] == 0
+    assert agg["accepted_rate"] == 0.0
+    assert agg["by_type"] == {} and agg["failure_reasons"] == {}
+
+
+def test_aggregate_rates_and_breakdowns():
+    recs = [
+        _rec("T1", "bugfix", "clean", 5, 0.0, 1000),
+        _rec("T2", "bugfix", "minor", 4, 0.10, 2000, "style-only"),
+        _rec("T3", "feature", "rework", 2, 0.60, 3000, "incomplete"),
+        _rec("T4", "feature", "rejected", 1, 0.90, 500, "hallucinated-api"),
+    ]
+    agg = outcomes.aggregate(recs)
+    assert agg["total"] == 4
+    assert agg["accepted"] == 2                      # clean + minor
+    assert agg["accepted_rate"] == 0.5
+    assert agg["clean_rate"] == 0.25
+    assert agg["by_type"]["bugfix"] == {"total": 2, "accepted": 2, "rate": 1.0}
+    assert agg["by_type"]["feature"]["rate"] == 0.0
+    assert agg["median_churn"] == 0.35              # median of 0.0, 0.10, 0.60, 0.90
+    assert agg["local_tokens"] == 6500
+    assert agg["mean_trust"] == 3.0
+    assert agg["failure_reasons"] == {"style-only": 1, "incomplete": 1, "hallucinated-api": 1}
