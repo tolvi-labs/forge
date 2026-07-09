@@ -302,3 +302,98 @@ def test_stop_command_exists():
     result = CliRunner().invoke(main, ["stop", "--help"])
     assert result.exit_code == 0
     assert "ollama" in result.output.lower()
+
+
+def test_outcome_records_metrics_and_subjective_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    tasks = _tasks_file(repo)
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    (repo / "feature.py").write_text("x = 1\ny = 2\n")
+    r.invoke(main, ["plan", "complete", "task-001", "--path", str(repo)])
+
+    # prompts, in order: accepted, trust, type, failure reason
+    res = r.invoke(main, ["outcome", "task-001", "--path", str(repo)],
+                   input="minor\n4\nfeature\nstyle-only\n")
+    assert res.exit_code == 0, res.output
+
+    from forge.plan import outcomes
+    from forge.cli import _plan_dir
+    recs = outcomes.read_outcomes(_plan_dir(repo.resolve()))
+    assert len(recs) == 1
+    assert recs[0]["task_id"] == "task-001"
+    assert recs[0]["accepted"] == "minor"
+    assert recs[0]["trust"] == 4
+    assert recs[0]["type"] == "feature"
+    assert recs[0]["failure_reason"] == "style-only"
+    # task-001 has no "files" restriction, so numstat sums the whole commit:
+    # feature.py's 2 lines + the untracked tasks.json (1 line) also swept up by `git add -A`.
+    assert recs[0]["produced_lines"] == 3
+
+
+def test_outcome_rejects_incomplete_task(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    tasks = _tasks_file(repo)
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    res = r.invoke(main, ["outcome", "task-001", "--path", str(repo)], input="clean\n5\nfeature\n")
+    assert res.exit_code != 0
+    assert "not completed" in res.output.lower()
+
+
+def _record_two_outcomes(repo, r):
+    (repo / "a.py").write_text("x = 1\n")
+    r.invoke(main, ["plan", "complete", "task-001", "--path", str(repo)])
+    r.invoke(main, ["outcome", "task-001", "--path", str(repo)], input="clean\n5\nbugfix\n")
+    (repo / "b.py").write_text("y = 2\n")
+    r.invoke(main, ["plan", "complete", "task-002", "--path", str(repo)])
+    r.invoke(main, ["outcome", "task-002", "--path", str(repo)], input="rework\n2\nfeature\nincomplete\n")
+
+
+def test_report_summarizes_current_plan(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    tasks = _tasks_file(repo)
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    _record_two_outcomes(repo, r)
+
+    res = r.invoke(main, ["report", "--path", str(repo)])
+    assert res.exit_code == 0, res.output
+    assert "50" in res.output          # acceptance 50% (1 clean of 2)
+    assert "bugfix" in res.output
+    assert "incomplete" in res.output  # failure-reason tally
+
+
+def test_report_empty_is_graceful(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(_tasks_file(repo)), "--path", str(repo)])
+    res = r.invoke(main, ["report", "--path", str(repo)])
+    assert res.exit_code == 0
+    assert "no outcomes" in res.output.lower()
+
+
+def test_report_all_pools_across_plans(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(_tasks_file(repo)), "--path", str(repo)])
+    _record_two_outcomes(repo, r)
+    res = r.invoke(main, ["report", "--all"])
+    assert res.exit_code == 0, res.output
+    assert "2" in res.output           # 2 tasks pooled
+    assert "caveat" in res.output.lower()

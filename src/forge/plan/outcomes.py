@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import statistics
 import subprocess
 from pathlib import Path
 
@@ -102,4 +103,43 @@ def compute_task_metrics(repo: Path, task, inference_log: Path) -> dict:
         "local_tokens": tokens,
         "duration_ms": duration,
         "tokens_per_sec": rate,
+    }
+
+
+_ACCEPTED = {"clean", "minor"}
+
+
+def aggregate(records: list[dict]) -> dict:
+    total = len(records)
+    if total == 0:
+        return {"total": 0, "accepted": 0, "accepted_rate": 0.0, "clean_rate": 0.0,
+                "by_type": {}, "median_churn": 0.0, "local_tokens": 0,
+                "mean_tokens_per_sec": 0.0, "mean_trust": 0.0, "failure_reasons": {}}
+    accepted = sum(1 for r in records if r.get("accepted") in _ACCEPTED)
+    clean = sum(1 for r in records if r.get("accepted") == "clean")
+    by_type: dict[str, dict] = {}
+    for r in records:
+        bucket = by_type.setdefault(r.get("type", "other"), {"total": 0, "accepted": 0})
+        bucket["total"] += 1
+        if r.get("accepted") in _ACCEPTED:
+            bucket["accepted"] += 1
+    for bucket in by_type.values():
+        bucket["rate"] = round(bucket["accepted"] / bucket["total"], 4)
+    rates = [r["tokens_per_sec"] for r in records if r.get("tokens_per_sec", 0) > 0]
+    reasons: dict[str, int] = {}
+    for r in records:
+        reason = r.get("failure_reason", "")
+        if reason:
+            reasons[reason] = reasons.get(reason, 0) + 1
+    return {
+        "total": total,
+        "accepted": accepted,
+        "accepted_rate": round(accepted / total, 4),
+        "clean_rate": round(clean / total, 4),
+        "by_type": by_type,
+        "median_churn": round(statistics.median(r.get("churn", 0.0) for r in records), 4),
+        "local_tokens": sum(r.get("local_tokens", 0) for r in records),
+        "mean_tokens_per_sec": round(sum(rates) / len(rates), 1) if rates else 0.0,
+        "mean_trust": round(statistics.mean(r.get("trust", 0) for r in records), 2),
+        "failure_reasons": reasons,
     }
