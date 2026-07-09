@@ -92,8 +92,29 @@ forge verify                        # export the diff + manifest for Claude to r
 | `forge search` / `chat` | Semantic retrieval; chat with CAG+RAG context (Tolvi vault included) |
 | `forge plan load/next/complete/status` | Drive a Claude `tasks.json` in dependency order, auto-committing per task |
 | `forge verify` | Export the diff since plan baseline + manifest for Claude's review |
+| `forge outcome` / `forge report` | Record a completed task's outcome (rework churn + local tokens, auto-filled) and pool the dogfooding metrics — acceptance, churn, tokens, trust |
 | `forge profile list/set` | Choose the stack profile that shapes the context window |
 | `forge agents run` | Multi-agent scaffold: code + review per task (proposes, doesn't auto-apply) |
+
+### Measuring the local-model gate
+
+Forge can tell you whether the local model is actually pulling its weight, as a byproduct of the normal plan loop. After the local model implements a task, review and fix it, then record the outcome **before** you move on:
+
+```bash
+forge plan complete task-001    # the local model's work is auto-committed
+# ...you review the diff and fix anything the model got wrong...
+forge outcome task-001          # auto-fills rework churn + local tokens; prompts for accepted/trust/type
+forge plan next                 # on to the next task
+```
+
+`forge outcome` must run before `forge plan next` touches the same files, because the working-tree delta on the task's files is what it counts as your rework. When you want the picture across a plan — or across every plan and repo — pool it:
+
+```bash
+forge report          # this plan: acceptance rate, median churn, tokens, mean trust
+forge report --all    # pooled across all plans, broken down by task type
+```
+
+Acceptance rate is the "is the local model good enough" number, and rework churn is whether fixing its output eats the token savings.
 
 ## How it works
 
