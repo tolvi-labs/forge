@@ -1,7 +1,9 @@
 """Per-task dogfooding outcomes: capture and aggregate local-model quality metrics."""
 from __future__ import annotations
 
+import datetime
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -26,3 +28,78 @@ def upsert_outcome(plan_dir: Path, record: dict) -> None:
     records = [r for r in read_outcomes(plan_dir) if r.get("task_id") != record.get("task_id")]
     records.append(record)
     write_outcomes(plan_dir, records)
+
+
+def _git(repo: Path, *args: str) -> str:
+    proc = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
+    return proc.stdout
+
+
+def _find_task_commit(repo: Path, task_id: str) -> str | None:
+    prefix = f"[{task_id}] "
+    for line in _git(repo, "log", "--format=%H %s").splitlines():
+        sha, _, subject = line.partition(" ")
+        if subject.startswith(prefix):
+            return sha
+    return None
+
+
+def _commit_time(repo: Path, ref: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(_git(repo, "show", "-s", "--format=%cI", ref).strip())
+
+
+def _sum_numstat(repo: Path, args: list[str], files: list[str]) -> tuple[int, int]:
+    cmd = [*args, "--numstat"]
+    if files:
+        cmd += ["--", *files]
+    added = deleted = 0
+    for line in _git(repo, *cmd).splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            added += int(parts[0])
+            deleted += int(parts[1])
+    return added, deleted
+
+
+def _sum_tokens(inference_log: Path, start: datetime.datetime,
+                 end: datetime.datetime) -> tuple[int, float, float]:
+    if not inference_log.exists():
+        return 0, 0.0, 0.0
+    tokens = 0
+    duration = 0.0
+    rates: list[float] = []
+    for line in inference_log.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        ts = datetime.datetime.fromisoformat(rec["ts"])
+        if start < ts <= end:
+            tokens += rec.get("tokens_in", 0) + rec.get("tokens_out", 0)
+            duration += rec.get("duration_ms", 0.0)
+            if rec.get("tokens_per_sec", 0.0) > 0:
+                rates.append(rec["tokens_per_sec"])
+    mean_rate = round(sum(rates) / len(rates), 1) if rates else 0.0
+    return tokens, duration, mean_rate
+
+
+def compute_task_metrics(repo: Path, task, inference_log: Path) -> dict:
+    sha = _find_task_commit(repo, task.id)
+    if sha is None:
+        return {"commit": None, "produced_lines": 0, "rework_lines": 0, "churn": 0.0,
+                "local_tokens": 0, "duration_ms": 0.0, "tokens_per_sec": 0.0}
+    produced, _ = _sum_numstat(repo, ["show", "--format=", sha], task.files)
+    r_added, r_deleted = _sum_numstat(repo, ["diff", sha], task.files)
+    rework = r_added + r_deleted
+    tokens, duration, rate = _sum_tokens(
+        inference_log, _commit_time(repo, f"{sha}^"), _commit_time(repo, sha))
+    return {
+        "commit": sha,
+        "produced_lines": produced,
+        "rework_lines": rework,
+        "churn": round(rework / max(produced, 1), 4),
+        "local_tokens": tokens,
+        "duration_ms": duration,
+        "tokens_per_sec": rate,
+    }
