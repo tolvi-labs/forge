@@ -15,6 +15,16 @@ from forge import __version__, config
 
 console = Console()
 
+# Forge brand accent (brand lime). Rich downgrades truecolor to the
+# nearest ANSI color automatically and strips styling on non-color terminals.
+BRAND = "#C6F23E"
+
+
+def _render_logo() -> None:
+    """Print the Forge brand wordmark; degrades to plain text off-color terminals."""
+    console.print(f"[bold {BRAND}]⬢ FORGE[/]  [dim]· local-first AI dev environment[/]")
+    console.print(f"[{BRAND}]{'─' * 44}[/]")
+
 
 @click.group()
 @click.version_option(__version__, prog_name="forge")
@@ -24,6 +34,7 @@ def main() -> None:
 
 def _render_status() -> None:
     """Print the active model, context limit, and stack profile."""
+    _render_logo()
     profile_name = config.load_active_profile()
     try:
         hp = config.load_hardware_profile()
