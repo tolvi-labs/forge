@@ -51,7 +51,9 @@ The installer detects your hardware, pulls the right Ollama models, builds the `
 
 `forge start` is also the command to use after a reboot or in a fresh shell — it starts Ollama in the background and leaves it running. `forge stop` shuts down that server (only if Forge started it).
 
-## VS Code (Continue.dev)
+## VS Code (Continue.dev) — optional keystroke assist
+
+Forge's real surface is the batch loop above: a frontier model plans, the local model executes a whole task set, and you review the diff. This section is the *other altitude* — opt-in, in-editor assistance for when you want a local model at your cursor. It runs entirely on your hardware, so treat it as best-effort: on a laptop, local autocomplete will not match a cloud tool's latency, and that is a hardware reality rather than a defect Forge is hiding. Reach for the batch loop when you want the local model's real strength; reach for this only when you want a quick local completion or edit without leaving the editor.
 
 Bootstrap writes the Continue config to `~/.continue/config.yaml` automatically. To finish the setup:
 
@@ -62,7 +64,7 @@ Bootstrap writes the Continue config to `~/.continue/config.yaml` automatically.
 The config wires four models automatically:
 - **Chat / Edit / Apply** → `qwen2.5-coder:7b` (fast, best for everyday coding questions)
 - **Chat (Deep)** → `forge-coder` (14b, long context — switch to this for architecture or multi-file work)
-- **Autocomplete** → `qwen2.5-coder:7b` (fast, low-latency)
+- **Autocomplete** → `qwen2.5-coder:7b` (best-effort; latency tracks your hardware)
 - **Embeddings** → `nomic-embed-text`
 
 MCP tool integrations (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright) are configured for Claude Code, not Continue.dev — see [`mcp/servers.json`](./mcp/servers.json). Wiring MCP servers into Continue.dev injects tool definitions that cause smaller models to emit tool-call JSON instead of answers.
