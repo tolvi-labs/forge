@@ -63,7 +63,7 @@ Bootstrap writes the Continue config to `~/.continue/config.yaml` automatically.
 
 The config wires four models automatically:
 - **Chat / Edit / Apply** → `qwen2.5-coder:7b` (fast, best for everyday coding questions)
-- **Chat (Deep)** → `forge-coder` (14b, long context — switch to this for architecture or multi-file work)
+- **Chat (Deep)** → `forge-coder` (qwen3-coder:30b, long context — switch to this for architecture or multi-file work)
 - **Autocomplete** → `qwen2.5-coder:7b` (best-effort; latency tracks your hardware)
 - **Embeddings** → `nomic-embed-text`
 

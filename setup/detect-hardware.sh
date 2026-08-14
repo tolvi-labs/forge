@@ -35,9 +35,9 @@ fi
 
 STRETCH_MODEL=""
 if [[ $RAM_GB -ge 48 ]]; then
-  RECOMMENDED_MODEL="qwen2.5-coder:32b"; MAX_CONTEXT=131072
+  RECOMMENDED_MODEL="qwen3-coder-next"; MAX_CONTEXT=131072
 elif [[ $RAM_GB -ge 24 ]]; then
-  RECOMMENDED_MODEL="qwen2.5-coder:14b"; STRETCH_MODEL="qwen2.5-coder:32b-instruct-q4_K_M"; MAX_CONTEXT=65536
+  RECOMMENDED_MODEL="qwen3-coder:30b"; STRETCH_MODEL="qwen3-coder-next"; MAX_CONTEXT=65536
 elif [[ $RAM_GB -ge 16 ]]; then
   RECOMMENDED_MODEL="qwen2.5-coder:14b"; MAX_CONTEXT=65536
 else
