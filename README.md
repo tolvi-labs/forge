@@ -29,16 +29,17 @@ Add it to your shell profile or a per-project `.envrc` (via [direnv](https://dir
 
 ## Install
 
-Install the CLI from PyPI or Homebrew, then bring up the local models:
+Install the CLI from PyPI, then bring up the local models:
 
 ```bash
-pip install tolvi-forge
-# or, on macOS/Linux via Homebrew:
-brew install tolvi-labs/tap/tolvi-forge
+pipx install tolvi-forge
+# or: pip install tolvi-forge
 
 forge start     # pulls the Ollama models and builds forge-coder on first run
 forge doctor    # diagnose any missing pieces
 ```
+
+`pipx` is recommended over `pip` for CLI tools — it installs Forge into its own isolated environment rather than your active virtualenv, avoiding dependency conflicts with whatever else you have installed. No Homebrew formula yet; Forge's dependency tree (ChromaDB, tree-sitter, tiktoken) doesn't fit Homebrew's typical vendored-resource packaging model well, so PyPI is the primary distribution channel.
 
 For a fully guided setup — hardware detection, model pulls, and the Continue.dev + MCP editor configs written for you — install from source:
 
