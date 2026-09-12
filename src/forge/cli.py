@@ -15,7 +15,7 @@ from forge import __version__, config
 
 console = Console()
 
-# Forge brand accent (brand lime). Rich downgrades truecolor to the
+# Forge brand accent (lime). Rich downgrades truecolor to the
 # nearest ANSI color automatically and strips styling on non-color terminals.
 BRAND = "#C6F23E"
 
