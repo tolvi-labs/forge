@@ -1,4 +1,4 @@
-"""Load a repo's Tolvi vault (tolvi-format-v1) into a token-budgeted CAG block.
+"""Load a repo's Tolvi vault (tolvi-format-v2) into a token-budgeted CAG block.
 
 This is the only coupling between Forge and Tolvi, and it is one-way and
 format-only: Forge reads decisions/patterns a repo already keeps under
