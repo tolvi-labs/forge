@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email security@torresatlantic.com with details and reproduction steps. Do not open a public issue for security reports. We aim to acknowledge within 72 hours.
+Email security@tolvilabs.com with details and reproduction steps. Do not open a public issue for security reports. We aim to acknowledge within 72 hours.
 
 ## Scope
 

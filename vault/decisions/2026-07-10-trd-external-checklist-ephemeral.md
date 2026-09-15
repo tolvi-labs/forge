@@ -29,4 +29,4 @@ We caught a contradiction: implementation plans and design specs have been commi
 
 ## Outcome
 
-Repos keep code plus durable vault decisions; pre-code intent is peer-reviewed where review actually happens; and a single test — does it outlive the work? — keeps the repo from accreting stale documents. This changes the superpowers authoring convention across every repo, so rewiring the superpowers skills to stop emitting repo plans is a separate follow-up, and this decision is a candidate for promotion to the `internal-tooling` vault. See [[2026-07-10-forge-v0-batch-lane]].
+Repos keep code plus durable vault decisions; pre-code intent is peer-reviewed where review actually happens; and a single test — does it outlive the work? — keeps the repo from accreting stale documents. This changes the superpowers authoring convention across every repo, so rewiring the superpowers skills to stop emitting repo plans is a separate follow-up, and this decision is a candidate for promotion to the shared tooling vault. See [[2026-07-10-forge-v0-batch-lane]].

@@ -21,4 +21,6 @@ pytest
 
 ## Brand isolation
 
-External contributors must keep contributions brand-neutral. Do not reference Torres Atlantic internal products, private repositories, customer names, or non-public infrastructure in code, comments, tests, or docs. Forge ships under the public `tolvi-labs` brand only.
+All content in this repo is brand-neutral. The single exception is the [`NOTICE`](./NOTICE) file, which carries the project's attribution.
+
+**Do not reference** parent organizations, sibling products, customer names, private repositories, or non-public infrastructure anywhere else, including code, comments, tests, docs, commit messages, branch names, or PR descriptions. Forge ships under the public `tolvi-labs` brand only.

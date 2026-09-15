@@ -19,6 +19,11 @@ jobs:
       # than CI silently resolving a newer (possibly breaking) version.
       - name: Sync (locked)
         run: uv sync --extra dev --locked
+      - name: Brand-isolation guard
+        run: bash .github/scripts/brand-isolation-check.sh
+        env:
+          BRAND_BLOCKLIST: ${{ vars.BRAND_BLOCKLIST }}
+
       - name: Lint
         run: uv run ruff check .
       - name: Test
