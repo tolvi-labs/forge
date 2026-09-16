@@ -56,6 +56,7 @@ PATTERN="$(printf '%s' "$PATTERN" | sed -E 's/^\|+//; s/\|+$//; s/\|\|+/|/g')"
 #   - This script: provided so an incidental value never trips the check on itself
 ALLOWLIST_PATHS=(
   'NOTICE'                                  # attribution: the one place the parent belongs
+  'LICENSE'                                 # attribution, same category as NOTICE
   'pyproject.toml'                          # authors metadata, published to PyPI
   '.github/scripts/brand-isolation-check.sh'
 )

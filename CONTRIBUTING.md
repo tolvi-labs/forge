@@ -21,6 +21,6 @@ pytest
 
 ## Brand isolation
 
-All content in this repo is brand-neutral. The single exception is the [`NOTICE`](./NOTICE) file, which carries the project's attribution.
+All content in this repo is brand-neutral. The only exceptions are the [`NOTICE`](./NOTICE) file, which carries the project's attribution, and the copyright line in [`LICENSE`](./LICENSE).
 
 **Do not reference** parent organizations, sibling products, customer names, private repositories, or non-public infrastructure anywhere else, including code, comments, tests, docs, commit messages, branch names, or PR descriptions. Forge ships under the public `tolvi-labs` brand only.
