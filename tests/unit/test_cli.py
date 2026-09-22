@@ -5,7 +5,7 @@ from click.testing import CliRunner
 import forge.embedder.embedder as emb
 import forge.llm as llm_mod
 from forge.cli import main, _dedup_hits, _trim_history
-from forge import config as _config
+from forge import __version__, config as _config
 
 
 def _profile(tmp_path: Path) -> Path:
@@ -23,7 +23,7 @@ def _profile(tmp_path: Path) -> Path:
 def test_version_flag():
     result = CliRunner().invoke(main, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.output
+    assert __version__ in result.output
 
 
 def test_status_shows_model_and_profile(tmp_path, monkeypatch):
@@ -59,7 +59,7 @@ def test_status_json_reports_the_profile(tmp_path, monkeypatch):
     out = json.loads(result.output)
     assert set(out) == {"forge_version", "model", "active_profile",
                         "hardware_profile_path", "hardware_profile"}
-    assert out["forge_version"] == "0.1.0"
+    assert out["forge_version"] == __version__
     assert out["model"] == "forge-coder"
     assert out["active_profile"] == "react-node"
     assert out["hardware_profile_path"] == str(tmp_path / "forge" / "hardware-profile.json")
@@ -90,7 +90,7 @@ def test_doctor_json_reports_each_check(tmp_path, monkeypatch):
     result = CliRunner().invoke(main, ["doctor", "--json"])
     assert result.exit_code == 0
     out = json.loads(result.output)
-    assert out["forge_version"] == "0.1.0"
+    assert out["forge_version"] == __version__
     checks = {c["id"]: c for c in out["checks"]}
     assert list(checks) == ["ollama_installed", "hardware_profile", "config_dir"]
     assert checks["ollama_installed"]["ok"] is False

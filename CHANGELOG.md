@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
+### Added
+
+- `forge detect-hardware`: detects RAM, GPU and architecture and writes the hardware profile that picks the model tier. It ships in the package, so a `pipx install` can generate its own profile.
+- `forge status --json` and `forge doctor --json`: machine-readable output for tools that drive Forge. Both include `forge_version`, and each doctor check has a stable `id`. Text output is unchanged.
+
+### Changed
+
+- `setup/bootstrap.sh` installs the CLI first, then detects hardware with `forge detect-hardware`.
+- Missing-profile messages in `forge start`, `forge status` and `forge doctor` now name `forge detect-hardware`.
+
+### Removed
+
+- `setup/detect-hardware.sh`, replaced by `forge detect-hardware` with the same RAM tiers, GPU detection and 8GB fallback.
+
+### Fixed
+
+- A `pipx install` could not run `forge start`, `forge status` or `forge chat`: the hardware profile they need came from a setup script the package does not ship. The README's pipx steps now run `forge detect-hardware` first.
+
 ## [0.1.0] - 2026-09-09
 
 Initial release. Published to PyPI as `tolvi-forge`.
