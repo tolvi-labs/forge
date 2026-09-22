@@ -1,6 +1,7 @@
 """Forge command-line interface."""
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import hashlib
 import json
@@ -39,7 +40,7 @@ def _render_status() -> None:
     try:
         hp = config.load_hardware_profile()
     except FileNotFoundError:
-        console.print("[yellow]Hardware profile not detected.[/] Run setup/detect-hardware.sh.")
+        console.print("[yellow]Hardware profile not detected.[/] Run `forge detect-hardware`.")
         console.print(f"Active profile : {profile_name}")
         return
     console.print(f"Model          : forge-coder ({hp.recommended_model})")
@@ -48,11 +49,45 @@ def _render_status() -> None:
     console.print(f"Active profile : {profile_name}")
 
 
+def _status_data() -> dict:
+    try:
+        hp = dataclasses.asdict(config.load_hardware_profile())
+    except FileNotFoundError:
+        hp = None
+    return {
+        "forge_version": __version__,
+        "model": "forge-coder",
+        "active_profile": config.load_active_profile(),
+        "hardware_profile_path": str(config.hardware_profile_path()),
+        "hardware_profile": hp,
+    }
+
+
 @main.command()
-def status() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text.")
+def status(as_json: bool) -> None:
     """Show the active model, context limit, and stack profile."""
+    if as_json:
+        click.echo(json.dumps(_status_data(), indent=2))
+        return
     console.clear()
     _render_status()
+
+
+@main.command("detect-hardware")
+def detect_hardware() -> None:
+    """Detect this machine's hardware and write the hardware profile."""
+    from forge import hardware
+
+    profile = hardware.detect()
+    path = config.hardware_profile_path()
+    hardware.write_profile(profile, path)
+    console.print(f"✅ Hardware profile written to {path}", soft_wrap=True)
+    console.print(
+        f"   {profile['arch']} / {profile['os']} / {profile['ram_gb']}GB / {profile['gpu_type']}"
+        f" → {profile['recommended_model']} @ {profile['max_context_tokens']} tokens",
+        soft_wrap=True,
+    )
 
 
 @main.command()
@@ -63,7 +98,7 @@ def start() -> None:
     try:
         hp = config.load_hardware_profile()
     except FileNotFoundError:
-        console.print("[yellow]Hardware profile not detected.[/] Run setup/detect-hardware.sh.")
+        console.print("[yellow]Hardware profile not detected.[/] Run `forge detect-hardware`.")
         raise SystemExit(1)
 
     def event(msg: str) -> None:
@@ -95,21 +130,35 @@ def _check(label: str, ok: bool, detail: str = "") -> None:
     console.print(f"{mark} {label}{suffix}")
 
 
-@main.command()
-def doctor() -> None:
-    """Diagnose the local Forge environment."""
+def _doctor_checks() -> list[dict]:
     ollama = shutil.which("ollama")
-    _check("Ollama installed", ollama is not None,
-           "" if ollama else "install from https://ollama.com")
-
     profile_path = config.hardware_profile_path()
-    _check("Hardware profile present", profile_path.exists(),
-           str(profile_path) if profile_path.exists()
-           else f"missing at {profile_path}; run setup/detect-hardware.sh")
-
     cfg = config.config_dir()
-    _check("Config directory", cfg.exists(),
-           str(cfg) if cfg.exists() else f"will be created at {cfg}")
+    return [
+        {"id": "ollama_installed", "label": "Ollama installed", "ok": ollama is not None,
+         "detail": "" if ollama else "install from https://ollama.com"},
+        {"id": "hardware_profile", "label": "Hardware profile present", "ok": profile_path.exists(),
+         "detail": str(profile_path) if profile_path.exists()
+         else f"missing at {profile_path}; run `forge detect-hardware`"},
+        {"id": "config_dir", "label": "Config directory", "ok": cfg.exists(),
+         "detail": str(cfg) if cfg.exists() else f"will be created at {cfg}"},
+    ]
+
+
+@main.command()
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text.")
+def doctor(as_json: bool) -> None:
+    """Diagnose the local Forge environment."""
+    checks = _doctor_checks()
+    if as_json:
+        click.echo(json.dumps({
+            "forge_version": __version__,
+            "ok": all(c["ok"] for c in checks),
+            "checks": checks,
+        }, indent=2))
+        return
+    for c in checks:
+        _check(c["label"], c["ok"], c["detail"])
 
 
 @main.command()

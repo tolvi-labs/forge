@@ -8,42 +8,9 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/forge"
 echo "⚒️  Forge — local AI dev environment"
 echo "────────────────────────────────────"
 
-# 1. Hardware detection
-echo "Step 1/7 — Detecting hardware..."
-bash "$REPO_DIR/setup/detect-hardware.sh"
-PROFILE="$CONFIG_DIR/hardware-profile.json"
-RECOMMENDED_MODEL=$(grep '"recommended_model"' "$PROFILE" | sed 's/.*: "\(.*\)".*/\1/')
-MAX_CONTEXT=$(grep '"max_context_tokens"' "$PROFILE" | sed 's/[^0-9]//g')
-
-# 2. Ollama
-echo "Step 2/7 — Checking Ollama..."
-if ! command -v ollama &>/dev/null; then
-  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &>/dev/null; then
-    brew install ollama
-  else
-    echo "   Install Ollama manually: https://ollama.com/download" >&2; exit 1
-  fi
-fi
-if ! ollama list &>/dev/null; then
-  ollama serve &>/dev/null & sleep 3
-fi
-
-# 3. Models
-echo "Step 3/7 — Pulling models (may take a while)..."
-ollama pull "$RECOMMENDED_MODEL"
-ollama pull qwen2.5-coder:7b
-ollama pull nomic-embed-text
-
-# 4. forge-coder Modelfile
-echo "Step 4/7 — Building forge-coder..."
-RENDERED="$CONFIG_DIR/Modelfile"
-sed -e "s|{{RECOMMENDED_MODEL}}|$RECOMMENDED_MODEL|g" \
-    -e "s|{{MAX_CONTEXT}}|$MAX_CONTEXT|g" \
-    "$REPO_DIR/ollama/Modelfile.tmpl" > "$RENDERED"
-ollama create forge-coder -f "$RENDERED"
-
-# 5. Python env (dedicated 3.12 venv — system Python is 3.14)
-echo "Step 5/7 — Installing Forge CLI into a Python 3.12 venv..."
+# 1. Python env (dedicated 3.12 venv — system Python is 3.14). First, because
+#    hardware detection is a forge command.
+echo "Step 1/7 — Installing Forge CLI into a Python 3.12 venv..."
 if ! command -v uv &>/dev/null; then
   if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &>/dev/null; then
     brew install uv
@@ -67,6 +34,40 @@ if ! grep -q 'local/bin' "$SHELL_RC" 2>/dev/null; then
   echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
   echo "   Added ~/.local/bin to PATH in $SHELL_RC (restart shell or: source $SHELL_RC)"
 fi
+
+# 2. Hardware detection
+echo "Step 2/7 — Detecting hardware..."
+"$REPO_DIR/.venv/bin/forge" detect-hardware
+PROFILE="$CONFIG_DIR/hardware-profile.json"
+RECOMMENDED_MODEL=$(grep '"recommended_model"' "$PROFILE" | sed 's/.*: "\(.*\)".*/\1/')
+MAX_CONTEXT=$(grep '"max_context_tokens"' "$PROFILE" | sed 's/[^0-9]//g')
+
+# 3. Ollama
+echo "Step 3/7 — Checking Ollama..."
+if ! command -v ollama &>/dev/null; then
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &>/dev/null; then
+    brew install ollama
+  else
+    echo "   Install Ollama manually: https://ollama.com/download" >&2; exit 1
+  fi
+fi
+if ! ollama list &>/dev/null; then
+  ollama serve &>/dev/null & sleep 3
+fi
+
+# 4. Models
+echo "Step 4/7 — Pulling models (may take a while)..."
+ollama pull "$RECOMMENDED_MODEL"
+ollama pull qwen2.5-coder:7b
+ollama pull nomic-embed-text
+
+# 5. forge-coder Modelfile
+echo "Step 5/7 — Building forge-coder..."
+RENDERED="$CONFIG_DIR/Modelfile"
+sed -e "s|{{RECOMMENDED_MODEL}}|$RECOMMENDED_MODEL|g" \
+    -e "s|{{MAX_CONTEXT}}|$MAX_CONTEXT|g" \
+    "$REPO_DIR/ollama/Modelfile.tmpl" > "$RENDERED"
+ollama create forge-coder -f "$RENDERED"
 
 # 6. Editor + MCP configs
 echo "Step 6/7 — Installing editor + MCP configs..."

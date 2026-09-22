@@ -52,6 +52,61 @@ def test_doctor_runs_and_reports_checks(tmp_path, monkeypatch):
     assert ("✅" in result.output) or ("❌" in result.output)
 
 
+def test_status_json_reports_the_profile(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(_profile(tmp_path)))
+    result = CliRunner().invoke(main, ["status", "--json"])
+    assert result.exit_code == 0
+    out = json.loads(result.output)
+    assert set(out) == {"forge_version", "model", "active_profile",
+                        "hardware_profile_path", "hardware_profile"}
+    assert out["forge_version"] == "0.1.0"
+    assert out["model"] == "forge-coder"
+    assert out["active_profile"] == "react-node"
+    assert out["hardware_profile_path"] == str(tmp_path / "forge" / "hardware-profile.json")
+    assert out["hardware_profile"]["recommended_model"] == "qwen2.5-coder:14b"
+    assert out["hardware_profile"]["max_context_tokens"] == 65536
+
+
+def test_status_json_without_profile_reports_null(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    result = CliRunner().invoke(main, ["status", "--json"])
+    assert result.exit_code == 0
+    out = json.loads(result.output)
+    assert out["hardware_profile"] is None
+    assert out["active_profile"] == "react-node"
+
+
+def test_status_json_does_not_clear_the_screen(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(_profile(tmp_path)))
+    cleared = []
+    monkeypatch.setattr("forge.cli.console.clear", lambda *a, **k: cleared.append(True))
+    CliRunner().invoke(main, ["status", "--json"])
+    assert cleared == []
+
+
+def test_doctor_json_reports_each_check(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(_profile(tmp_path)))
+    monkeypatch.setattr("forge.cli.shutil.which", lambda name: None)
+    result = CliRunner().invoke(main, ["doctor", "--json"])
+    assert result.exit_code == 0
+    out = json.loads(result.output)
+    assert out["forge_version"] == "0.1.0"
+    checks = {c["id"]: c for c in out["checks"]}
+    assert list(checks) == ["ollama_installed", "hardware_profile", "config_dir"]
+    assert checks["ollama_installed"]["ok"] is False
+    assert checks["hardware_profile"]["ok"] is True
+    assert checks["hardware_profile"]["detail"] == str(tmp_path / "forge" / "hardware-profile.json")
+    assert all(set(c) == {"id", "label", "ok", "detail"} for c in out["checks"])
+    assert out["ok"] is False
+
+
+def test_doctor_json_ok_when_every_check_passes(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(_profile(tmp_path)))
+    monkeypatch.setattr("forge.cli.shutil.which", lambda name: "/usr/local/bin/ollama")
+    out = json.loads(CliRunner().invoke(main, ["doctor", "--json"]).output)
+    assert out["ok"] is True
+
+
 def test_index_command_indexes_repo(tmp_path, monkeypatch):
     monkeypatch.setattr(emb, "embed", lambda texts, **k: [[0.0, 1.0] for _ in texts])
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))

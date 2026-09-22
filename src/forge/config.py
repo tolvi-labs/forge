@@ -65,7 +65,7 @@ def load_hardware_profile(path: Path | None = None) -> HardwareProfile:
     path = path or hardware_profile_path()
     if not path.exists():
         raise FileNotFoundError(
-            f"No hardware profile at {path}. Run setup/detect-hardware.sh first."
+            f"No hardware profile at {path}. Run `forge detect-hardware` first."
         )
     return HardwareProfile.from_dict(json.loads(path.read_text()))
 

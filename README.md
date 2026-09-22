@@ -35,8 +35,9 @@ Install the CLI from PyPI, then bring up the local models:
 pipx install tolvi-forge
 # or: pip install tolvi-forge
 
-forge start     # pulls the Ollama models and builds forge-coder on first run
-forge doctor    # diagnose any missing pieces
+forge detect-hardware   # picks the model tier your RAM can run
+forge start             # pulls the Ollama models and builds forge-coder on first run
+forge doctor            # diagnose any missing pieces
 ```
 
 `pipx` is recommended over `pip` for CLI tools: it installs Forge into its own isolated environment rather than your active virtualenv, avoiding dependency conflicts with whatever else you have installed. No Homebrew formula yet; Forge's dependency tree (ChromaDB, tree-sitter, tiktoken) doesn't fit Homebrew's typical vendored-resource packaging model well, so PyPI is the primary distribution channel.
@@ -89,7 +90,8 @@ forge verify                        # export the diff + manifest for Claude to r
 | Command | What it does |
 |---|---|
 | `forge start` / `stop` | Bring Ollama up + ensure models/`forge-coder` then show status; stop the server (only if Forge started it) |
-| `forge status` / `doctor` | Active model/context/profile; environment diagnostics |
+| `forge detect-hardware` | Detect RAM, GPU and architecture, and write the hardware profile that picks the model tier |
+| `forge status` / `doctor` `[--json]` | Active model/context/profile; environment diagnostics. `--json` emits machine-readable output for tools |
 | `forge index [--watch]` | Tree-sitter chunk + embed a repo into a local ChromaDB index |
 | `forge watch` | Live TUI dashboard: auto-discovers active plans, loop phase, inference rate, context fill |
 | `forge search` / `chat` | Semantic retrieval; chat with CAG+RAG context (Tolvi vault included) |
