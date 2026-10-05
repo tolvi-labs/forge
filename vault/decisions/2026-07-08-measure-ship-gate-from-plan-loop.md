@@ -6,6 +6,7 @@ status: active
 ticket: none
 user_impact: none
 product_area: Release
+superseded_in_part_by: [[2026-10-05-forge-applies-diffs-on-branch]]
 ---
 
 # Measure the ship gate as a byproduct of the plan loop
@@ -30,3 +31,5 @@ Forge's ship decision hinges on whether the local model is actually good enough 
 ## Outcome
 
 The dogfooding loop can emit acceptance, churn, token, and trust numbers per task and pooled across the whole period without manual bookkeeping, so the ship gate becomes a measured threshold instead of a judgment call; the harness is complete (`forge outcome` and `forge report` shipped, 162 tests passing) and ready to run against real dogfooding.
+
+> Superseded in part by [[2026-10-05-forge-applies-diffs-on-branch]] — the rejection of new `tasks.json` fields and a JSON export no longer holds: the manifest carries an optional per-task `context`, and `agents run --apply` emits `results.json` and `--json`. The four metrics and the outcome/report design stand; task `type` is still an outcome prompt.

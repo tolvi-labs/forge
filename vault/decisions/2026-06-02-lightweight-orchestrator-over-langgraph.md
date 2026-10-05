@@ -4,6 +4,7 @@ status: active
 date: 2026-06-02
 repo: forge
 ticket: none
+superseded_in_part_by: [[2026-10-05-forge-applies-diffs-on-branch]]
 ---
 
 ## TL;DR
@@ -26,3 +27,5 @@ The spec names LangGraph/CrewAI for multi-agent orchestration. For the MVP "scaf
 ## Outcome
 
 Forge ships a testable, safe multi-agent scaffold with zero new dependencies; richer orchestration (LangGraph) is a documented, isolated future addition.
+
+> Superseded in part by [[2026-10-05-forge-applies-diffs-on-branch]] — the rejection of auto-applying model output no longer holds: `agents run --apply` commits checked, reviewed diffs on a dedicated branch. The plain-Python orchestrator and the LangGraph deferral stand.
