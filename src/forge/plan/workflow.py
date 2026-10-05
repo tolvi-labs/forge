@@ -63,6 +63,8 @@ def load_plan(repo: Path, plan_dir: Path, manifest: Manifest) -> None:
     )
     write_state(plan_dir, {"baseline": baseline, "completed": []})
     write_phase(plan_dir, "executing")
+    # a new plan is a new `agents run --apply` run; never resume the last plan's results
+    (plan_dir / "results.json").unlink(missing_ok=True)
 
 
 def changed_paths(repo: Path) -> list[str]:

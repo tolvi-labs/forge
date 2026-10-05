@@ -153,3 +153,12 @@ def test_complete_with_files_but_no_changes_does_not_commit(tmp_path):
     before = _git(repo, "rev-list", "--count", "HEAD").stdout.strip()
     workflow.complete(repo, pdir, "task-001", "first", files=["feature.py"])
     assert _git(repo, "rev-list", "--count", "HEAD").stdout.strip() == before
+
+
+def test_load_plan_clears_previous_apply_results(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    pdir.mkdir()
+    (pdir / "results.json").write_text('{"tasks": [], "file_owner": {"a.py": "old"}}')
+    workflow.load_plan(repo, pdir, _manifest(tmp_path))
+    assert not (pdir / "results.json").exists()
