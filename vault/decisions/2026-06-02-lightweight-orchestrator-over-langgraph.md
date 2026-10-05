@@ -7,6 +7,8 @@ ticket: none
 superseded_in_part_by: [[2026-10-05-forge-applies-diffs-on-branch]]
 ---
 
+# Multi-agent scaffold; LangGraph deferred
+
 ## TL;DR
 
 The P5 multi-agent scaffold is a plain-Python orchestrator that proposes per-task changes for review; it does not auto-apply model output, and LangGraph is deferred until branching/retry/parallel graphs are actually needed. Rejected: adding LangGraph/CrewAI now (heavy dep for a scaffold); auto-applying + auto-committing model-written code (unsafe, defeats the verify step).

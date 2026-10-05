@@ -6,6 +6,8 @@ repo: forge
 ticket: none
 ---
 
+# Tree-sitter language-pack binding
+
 ## TL;DR
 
 Chunk with `tree-sitter-language-pack` (not the spec's `tree-sitter-languages`), whose bundled binding has a method-call Node API and a `str`-taking `parse()`. Rejected: `tree-sitter-languages` (effectively unmaintained, no current wheels); reimplementing grammars (NIH).

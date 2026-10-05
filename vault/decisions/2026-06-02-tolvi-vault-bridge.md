@@ -6,6 +6,8 @@ repo: forge
 ticket: none
 ---
 
+# Tolvi vault bridge
+
 ## TL;DR
 
 Forge consumes a repo's Tolvi vault as a read-only, format-only CAG layer (the substrate that makes it work best), never importing Tolvi code and auto-no-opping when no vault exists. Rejected: importing the Tolvi SDK/CLI (couples the two products); making the vault required (Forge must run standalone).

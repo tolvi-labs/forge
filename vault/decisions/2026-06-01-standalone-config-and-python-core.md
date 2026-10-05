@@ -6,6 +6,8 @@ repo: forge
 ticket: none
 ---
 
+# Standalone config and Python core
+
 ## TL;DR
 
 Forge is an independent sibling of Tolvi (own repo, own ~/.config/forge namespace), built on a Python core. Rejected: nesting under Tolvi's namespace; a Go core (fights the Tree-sitter/ChromaDB ecosystem).

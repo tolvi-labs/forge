@@ -6,6 +6,8 @@ repo: forge
 ticket: none
 ---
 
+# Class-level chunking granularity
+
 ## TL;DR
 
 Chunk code at class/function level — one chunk per class, not per method — for the MVP index. Rejected: method-level chunking (descending into class bodies produces overlapping class+method chunks that duplicate content and complicate dedup).

@@ -6,6 +6,8 @@ repo: forge
 ticket: none
 ---
 
+# MCP package npm-verification
+
 ## TL;DR
 
 Ship `mcp/servers.json` with packages verified to exist on npm; the TRD's `server-git`, `server-atlassian`, `@google-cloud/mcp-server`, `@invertase/mcp-firebase` don't exist and were replaced. A test allowlist guards against drift. Rejected: shipping the TRD names as-is (npx would fail to resolve them at runtime).
