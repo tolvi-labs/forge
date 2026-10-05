@@ -452,3 +452,100 @@ def test_report_all_pools_across_plans(tmp_path, monkeypatch):
     assert res.exit_code == 0, res.output
     assert "2" in res.output           # 2 tasks pooled
     assert "caveat" in res.output.lower()
+
+
+def test_plan_complete_commits_only_task_files_and_warns_on_leftovers(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    data = {"feature": "Demo", "tasks": [
+        {"id": "task-001", "title": "do first", "files": ["feature.py"],
+         "acceptance_criteria": ["x"]}]}
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(json.dumps(data))
+    r = CliRunner()
+    r.invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    (repo / "feature.py").write_text("x = 1\n")
+    (repo / "stray.txt").write_text("y\n")
+    res = r.invoke(main, ["plan", "complete", "task-001", "--path", str(repo)])
+    assert res.exit_code == 0, res.output
+    assert "stray.txt" in res.output
+    shown = _sub.run(["git", "-C", str(repo), "show", "--name-only", "--format=", "HEAD"],
+                     capture_output=True, text=True).stdout.split()
+    assert shown == ["feature.py"]
+
+
+APPLY_EDIT = "feature.py\n<<<<<<< SEARCH\n=======\nx = 1\n>>>>>>> REPLACE\n"
+
+
+def _apply_setup(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(json.dumps({"feature": "Demo", "tasks": [
+        {"id": "task-001", "title": "add feature", "files": ["feature.py"],
+         "acceptance_criteria": ["x is 1"]}]}))
+    CliRunner().invoke(main, ["plan", "load", str(tasks), "--path", str(repo)])
+    monkeypatch.setattr(llm_mod, "generate",
+                        lambda prompt, **k: "APPROVE" if "Reviewer" in prompt
+                        else f"```\n{APPLY_EDIT}```")
+    return repo
+
+
+def test_agents_run_apply_commits_on_branch_and_emits_json(tmp_path, monkeypatch):
+    repo = _apply_setup(tmp_path, monkeypatch)
+    res = CliRunner().invoke(main, ["agents", "run", "--apply", "--path", str(repo), "--json"])
+    assert res.exit_code == 0, res.output
+    data = json.loads(res.output)
+    assert data["branch"] == "forge/demo"
+    assert data["tasks"][0]["status"] == "applied"
+    log = _sub.run(["git", "-C", str(repo), "log", "-1", "--format=%s"],
+                   capture_output=True, text=True).stdout.strip()
+    assert log == "[task-001] add feature"
+
+
+def test_agents_run_apply_human_output_points_to_review(tmp_path, monkeypatch):
+    repo = _apply_setup(tmp_path, monkeypatch)
+    res = CliRunner().invoke(main, ["agents", "run", "--apply", "--path", str(repo)])
+    assert res.exit_code == 0, res.output
+    assert "task-001" in res.output and "applied" in res.output
+    assert "forge/demo" in res.output and "forge verify" in res.output
+
+
+def test_agents_run_apply_requires_loaded_plan(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _init_repo(repo)
+    res = CliRunner().invoke(main, ["agents", "run", "--apply", "--path", str(repo)])
+    assert res.exit_code != 0
+    assert "forge plan load" in res.output
+
+
+def test_agents_run_apply_rejects_dirty_tree(tmp_path, monkeypatch):
+    repo = _apply_setup(tmp_path, monkeypatch)
+    (repo / "stray.txt").write_text("x\n")
+    res = CliRunner().invoke(main, ["agents", "run", "--apply", "--path", str(repo)])
+    assert res.exit_code != 0
+    assert "stray.txt" in res.output
+
+
+def test_agents_run_without_tasks_json_or_apply_errors(tmp_path):
+    res = CliRunner().invoke(main, ["agents", "run"])
+    assert res.exit_code != 0
+
+
+def test_outcome_after_apply_uses_run_token_count(tmp_path, monkeypatch):
+    repo = _apply_setup(tmp_path, monkeypatch)
+    CliRunner().invoke(main, ["agents", "run", "--apply", "--path", str(repo)])
+    res = CliRunner().invoke(main, ["outcome", "task-001", "--path", str(repo)],
+                             input="clean\n5\nfeature\n")
+    assert res.exit_code == 0, res.output
+    from forge.plan import outcomes
+    from forge.cli import _plan_dir
+    rec = outcomes.read_outcomes(_plan_dir(repo.resolve()))[0]
+    assert rec["produced_lines"] == 1 and rec["rework_lines"] == 0

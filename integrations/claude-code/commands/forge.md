@@ -25,7 +25,7 @@ This is the value of this command. Translate the plan into a schema-valid `tasks
 
 - Each task declares the exact files it touches, so Forge can keep retrieval tight.
 - Each task carries concrete acceptance criteria — this is what the engineer reviews against later, so make them checkable, not vague.
-- Order tasks with `depends` so Forge runs them dependency-first.
+- Order tasks with `dependencies` so Forge runs them dependency-first.
 - A task the local model cannot do in isolation (cross-file architecture, a judgment call) does not belong here — that is a planning gap; surface it and stop rather than handing the local model work it will fail.
 
 Schema (Forge's `tasks.json`):
@@ -38,7 +38,7 @@ Schema (Forge's `tasks.json`):
       "title": "Add validate_token to auth.py",
       "files": ["src/auth.py"],
       "acceptance_criteria": ["validate_token(token) returns Claims", "raises AuthError on expiry"],
-      "depends": []
+      "dependencies": []
     }
   ]
 }
@@ -49,18 +49,18 @@ Write `tasks.json` to Forge's data dir (`forge plan load` places it under `~/.lo
 ## Step 4 — Execute in the background
 
 1. `forge start` if the models are not up.
-2. `forge plan load <tasks.json>`.
-3. Kick off execution in the background (`forge agents run <tasks.json>`, or loop `forge plan next` / `forge plan complete <id>`), so the session stays free.
+2. `forge plan load <tasks.json> --path <repo>` from a clean working tree.
+3. Kick off execution in the background with `forge agents run --apply --path <repo> --json`, so the session stays free. Forge commits each approved task as `[id] title` on a `forge/<feature>` branch; rejected tasks, and tasks that depend on them, are left uncommitted and listed with the reason.
 4. Tell the engineer: run `forge watch` in another pane to watch tasks land — that is the visibility surface, and because this is async batch work you can also just walk away and come back.
 
 ## Step 5 — Review, task by task
 
-When execution finishes, run `forge verify` to get the diff and manifest, then walk the engineer through it ONE TASK AT A TIME, each task's diff against its own acceptance criteria. There is no blanket "approve everything" — the review is the load-bearing step, and a one-click approval turns Forge into the autopilot it is designed not to be. For each task, show the diff, restate the acceptance criteria, and ask the engineer to accept, reject, or fix.
+When execution finishes, run `forge verify` (or `git log`/`git diff` on the `forge/<feature>` branch) to get the diff and manifest, then walk the engineer through it ONE TASK AT A TIME, each task's diff against its own acceptance criteria. There is no blanket "approve everything" — the review is the load-bearing step, and a one-click approval turns Forge into the autopilot it is designed not to be. For each task, show the diff, restate the acceptance criteria, and ask the engineer to accept, reject, or fix.
 
 ## Step 6 — Capture drift, then fix
 
 - **Drift accepted:** if the engineer accepts a change that diverges from what the plan said, that is exactly the moment to capture *why* — offer to write a vault decision (or run /tolvi-sync) recording the deviation, which may supersede the TRD. Reconciling intent against reality is the whole point of the vault; do not let the reason evaporate.
-- **Fix needed:** re-trigger just that task scoped (`forge plan next` on the single task), engineer watching. Do not open an open-ended chat loop and do not re-plan mid-flight.
+- **Fix needed:** fix it on the branch and commit, or rerun `forge agents run --apply --path <repo>` on the branch to retry rejected and skipped tasks, engineer watching. Do not open an open-ended chat loop and do not re-plan mid-flight.
 - **Outcome:** run `forge outcome <task_id>` per reviewed task so the dogfooding metrics (acceptance, churn, tokens, trust) are recorded.
 
 ## Guardrails

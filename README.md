@@ -80,8 +80,7 @@ forge chat -m "how does sign-in work?"   # ask, with CAG+RAG (and your Tolvi vau
 
 # Claude → Local → Claude
 forge plan load tasks.json          # load a Claude-produced plan (schema-validated)
-forge plan next                     # next dependency-unblocked task
-forge plan complete task-001        # mark done + auto-commit the work
+forge agents run --apply            # the local model implements every task, one commit each on forge/<feature>
 forge verify                        # export the diff + manifest for Claude to review
 ```
 
@@ -95,24 +94,23 @@ forge verify                        # export the diff + manifest for Claude to r
 | `forge index [--watch]` | Tree-sitter chunk + embed a repo into a local ChromaDB index |
 | `forge watch` | Live TUI dashboard: auto-discovers active plans, loop phase, inference rate, context fill |
 | `forge search` / `chat` | Semantic retrieval; chat with CAG+RAG context (Tolvi vault included) |
-| `forge plan load/next/complete/status` | Drive a Claude `tasks.json` in dependency order, auto-committing per task |
+| `forge plan load/next/complete/status` | Drive a Claude `tasks.json` in dependency order by hand; `complete` commits only the task's own files |
 | `forge verify` | Export the diff since plan baseline + manifest for Claude's review |
 | `forge outcome` / `forge report` | Record a completed task's outcome (rework churn + local tokens, auto-filled) and pool the dogfooding metrics: acceptance, churn, tokens, trust |
 | `forge profile list/set` | Choose the stack profile that shapes the context window |
-| `forge agents run` | Multi-agent scaffold: code + review per task (proposes, doesn't auto-apply) |
+| `forge agents run --apply [--json]` | The local model implements each task of the loaded plan from its real file contents and plan context; edits that stay in the task's files and pass the review agent are committed as `[id] title` on a `forge/<feature>` branch, and results go to `results.json` (`--json` prints them). Without `--apply`, it only prints proposals for a `tasks.json` |
 
 ### Measuring the local-model gate
 
-Forge can tell you whether the local model is actually pulling its weight, as a byproduct of the normal plan loop. After the local model implements a task, review and fix it, then record the outcome **before** you move on:
+Forge can tell you whether the local model is actually pulling its weight, as a byproduct of the normal plan loop. With `--apply`, the model's work is already committed per task on the `forge/<feature>` branch, so review the branch, fix what it got wrong, and record each task's outcome:
 
 ```bash
-forge plan complete task-001    # the local model's work is auto-committed
-# ...you review the diff and fix anything the model got wrong...
+forge agents run --apply        # one commit per approved task; rejected tasks are recorded automatically
+# ...you review the branch diff and fix anything the model got wrong...
 forge outcome task-001          # auto-fills rework churn + local tokens; prompts for accepted/trust/type
-forge plan next                 # on to the next task
 ```
 
-`forge outcome` must run before `forge plan next` touches the same files, because the working-tree delta on the task's files is what it counts as your rework. When you want the picture across a plan, or across every plan and repo, pool it:
+Rework is your change on top of the model's last commit, counted on the files each task edited last, so a later task's edits to a shared file never count against an earlier one. Run `forge agents run --apply` again on the branch to retry rejected or skipped tasks; it resumes rather than starting over. Driving tasks by hand works too: `forge plan complete task-001` commits that task's files, and `forge outcome` must then run before `forge plan next` touches the same files, because the working-tree delta on the task's files is what it counts as your rework. When you want the picture across a plan, or across every plan and repo, pool it:
 
 ```bash
 forge report          # this plan: acceptance rate, median churn, tokens, mean trust
@@ -125,7 +123,7 @@ Acceptance rate is the "is the local model good enough" number, and rework churn
 
 - **Index**: Tree-sitter AST chunking across 9 languages (with a line-based fallback), local embeddings via `nomic-embed-text`, a ChromaDB store with file-checksum incremental re-indexing.
 - **Context**: a hybrid **CAG + RAG** window: stable always-on context (manifests, README, the Tolvi vault) plus the top semantically-relevant code chunks (hard-capped to avoid lost-in-the-middle), tuned per [stack profile](./src/forge/profiles_data).
-- **Workflow**: `tasks.json` is the Claude↔Forge handoff contract; Forge validates it, tracks completion, auto-commits per task, and exports a verifiable diff.
+- **Workflow**: `tasks.json` is the Claude↔Forge handoff contract; Forge validates it, keeps each task's plan context, has the local model edit with SEARCH/REPLACE blocks it applies and checks itself, commits each approved task on its own branch, and exports a verifiable diff.
 - **Editors & tools**: Continue.dev (VS Code, primary) and Cursor against the same Ollama backend; a pre-wired, npm-verified [MCP layer](./mcp/servers.json) (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright) configured for Claude Code.
 
 Everything runs locally. No code leaves the machine during execution. Architecture and design notes live in [`docs/`](./docs).

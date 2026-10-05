@@ -401,7 +401,10 @@ def plan_complete(task_id: str, path: str) -> None:
     task = manifest.task(task_id)
     if task is None:
         raise click.ClickException(f"No such task: {task_id}")
-    complete(root, pdir, task_id, task.title)
+    leftovers = complete(root, pdir, task_id, task.title, task.files)
+    if leftovers:
+        console.print(f"[yellow]Left uncommitted (not in {task_id}'s files):[/] "
+                      + ", ".join(leftovers))
     done = len(read_state(pdir)["completed"])
     if done == len(manifest.tasks):
         write_phase(pdir, "done")
@@ -477,7 +480,10 @@ def outcome(task_id: str, path: str) -> None:
             f"{task_id} already has an outcome; overwrite?"):
         return
 
-    metrics = compute_task_metrics(root, task, config.data_dir() / "inference.log")
+    from forge.agents.apply import read_results
+
+    metrics = compute_task_metrics(root, task, config.data_dir() / "inference.log",
+                                   apply_results=read_results(pdir))
     if metrics["commit"] is None:
         console.print(f"[yellow]No commit found for {task_id}[/] (no-op task); recording zeroed metrics.")
     else:
@@ -599,9 +605,23 @@ def agents() -> None:
 
 
 @agents.command("run")
-@click.argument("tasks_json", type=click.Path(exists=True, dir_okay=False))
-def agents_run(tasks_json: str) -> None:
-    """Code + review each task in a tasks.json with the local model (proposes only)."""
+@click.argument("tasks_json", required=False, type=click.Path(exists=True, dir_okay=False))
+@click.option("--apply", "do_apply", is_flag=True,
+              help="Apply and commit each approved diff on a forge/<feature> branch.")
+@click.option("--path", type=click.Path(exists=True, file_okay=False), default=".",
+              help="Target repo for --apply (its plan must already be loaded).")
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text (--apply).")
+def agents_run(tasks_json: str | None, do_apply: bool, path: str, as_json: bool) -> None:
+    """Code + review each task with the local model; --apply commits approved diffs."""
+    if do_apply:
+        if tasks_json:
+            raise click.UsageError("--apply runs the plan loaded with `forge plan load`; "
+                                   "drop the tasks.json argument.")
+        _agents_apply(Path(path).resolve(), as_json)
+        return
+    if not tasks_json:
+        raise click.UsageError("Pass a tasks.json, or use --apply on a loaded plan.")
+
     import forge.llm as _llm
     from forge.agents.orchestrator import run_manifest
     from forge.plan.manifest import ManifestError, load_manifest
@@ -615,6 +635,72 @@ def agents_run(tasks_json: str) -> None:
         console.print(f"[dim]proposal:[/]\n{r.proposal}")
         console.print(f"[dim]review:[/]\n{r.review}\n")
     console.print("[yellow]Scaffold output — review proposals before applying.[/]")
+
+
+def _rag_fn(root: Path, profile):
+    """Retrieval for --apply, or None when this repo has never been indexed."""
+    index_dir = config.data_dir() / "indexes" / hashlib.sha256(str(root).encode()).hexdigest()[:16]
+    if not index_dir.exists():
+        return None
+    from forge.embedder import embedder
+    from forge.retriever.retriever import retrieve
+    from forge.store.chroma import ChromaStore
+
+    store = ChromaStore(index_dir)
+
+    def fn(task) -> list[dict]:
+        query = task.title + "\n" + "\n".join(task.acceptance_criteria)
+        own = {str(root / f) for f in task.files}
+        hits = retrieve(store, embedder.embed, query, top_k=profile.rag_top_k,
+                        rerank=profile.rerank)
+        return _dedup_hits(hits, own)
+    return fn
+
+
+def _agents_apply(root: Path, as_json: bool) -> None:
+    import forge.llm as _llm
+    from forge.agents.apply import ApplyError, context_budget, run_apply
+    from forge.plan.manifest import Manifest
+
+    pdir = _plan_dir(root)
+    if not (pdir / "manifest.json").exists():
+        raise click.ClickException(
+            f"No plan loaded for {root}. Run `forge plan load <tasks.json> --path {root}` first.")
+    manifest = Manifest.from_dict(json.loads((pdir / "manifest.json").read_text()))
+    profile = _active_profile()
+    try:
+        hardware_ctx = config.load_hardware_profile().max_context_tokens
+    except FileNotFoundError:
+        hardware_ctx = None
+    budget = context_budget(profile.max_context_tokens, hardware_ctx,
+                            reply_reserve=profile.reply_reserve_tokens,
+                            margin=profile.tokenizer_margin)
+    try:
+        results = run_apply(
+            root, pdir, manifest, generate_fn=_llm.generate, budget=budget,
+            rag_fn=_rag_fn(root, profile),
+            log_fn=_make_inference_logger(config.data_dir() / "inference.log"),
+        )
+    except (ApplyError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if as_json:
+        click.echo(json.dumps(results, indent=2))
+        return
+    marks = {"applied": "[green]applied[/]", "rejected": "[red]rejected[/]",
+             "skipped": "[dim]skipped[/]"}
+    for t in results["tasks"]:
+        line = f"{marks[t['status']]}\t[bold]{t['id']}[/] — {t['title']}"
+        if t["status"] == "applied":
+            line += f"  (+{t['diffstat']['added']}/-{t['diffstat']['deleted']})"
+            if t.get("tolerant"):
+                line += " [dim]tolerant apply[/]"
+        elif t.get("reason"):
+            line += f"\n\t[dim]{t['reason'].splitlines()[0]}[/]"
+        console.print(line)
+    console.print(f"Branch [bold]{results['branch']}[/]. Review with "
+                  f"`forge verify --path {root}` or `git diff {results['baseline'][:12]}`; "
+                  "then `forge outcome <task_id>` per applied task.")
 
 
 def _watch(root: Path, run) -> None:

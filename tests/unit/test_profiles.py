@@ -27,3 +27,9 @@ def test_fullstack_firebase_has_gcp_files_and_wider_topk():
 def test_load_unknown_profile_raises():
     with pytest.raises(ProfileError):
         load_profile("no-such-profile")
+
+
+def test_profile_defaults_reply_reserve_and_tokenizer_margin():
+    p = load_profile("react-node")
+    assert p.reply_reserve_tokens == 8192
+    assert p.tokenizer_margin == 0.10

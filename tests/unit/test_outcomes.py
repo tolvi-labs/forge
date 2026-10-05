@@ -130,3 +130,47 @@ def test_aggregate_rates_and_breakdowns():
     assert agg["local_tokens"] == 6500
     assert agg["mean_trust"] == 3.0
     assert agg["failure_reasons"] == {"style-only": 1, "incomplete": 1, "hallucinated-api": 1}
+
+
+def _apply_results(model_tip, file_owner, task_id="T3", tokens=500):
+    return {"model_tip": model_tip, "file_owner": file_owner,
+            "tasks": [{"id": task_id, "status": "applied", "tokens": tokens}]}
+
+
+def test_compute_metrics_apply_run_measures_rework_from_model_tip(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / "feature.py").write_text("a = 1\nb = 2\nc = 3\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "[T3] third", when="2026-07-07T12:10:00Z")
+    # a later model task edits the same file; that is NOT rework of T3
+    (repo / "feature.py").write_text("a = 1\nb = 2\nc = 4\n")
+    _git(repo, "commit", "-qam", "[T4] fourth", when="2026-07-07T12:20:00Z")
+    tip = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    (repo / "feature.py").write_text("a = 9\nb = 2\nc = 4\n")   # the human fix
+    results = _apply_results(tip, {"feature.py": "T3"})
+    m = outcomes.compute_task_metrics(repo, _task(["feature.py"]), _inference_log(tmp_path),
+                                      apply_results=results)
+    assert m["produced_lines"] == 3
+    assert m["rework_lines"] == 2            # only the human's 1-line fix
+    assert m["local_tokens"] == 500          # from the run's own per-task count
+
+
+def test_compute_metrics_apply_run_attributes_shared_file_to_last_editor(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / "feature.py").write_text("a = 1\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "[T3] third", when="2026-07-07T12:10:00Z")
+    tip = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    (repo / "feature.py").write_text("a = 2\n")
+    results = _apply_results(tip, {"feature.py": "T4"})
+    m = outcomes.compute_task_metrics(repo, _task(["feature.py"]), _inference_log(tmp_path),
+                                      apply_results=results)
+    assert m["rework_lines"] == 0            # T4 edited it last, so T4 owns the rework
+
+
+def test_aggregate_ignores_missing_trust():
+    recs = [{"accepted": "clean", "trust": 4, "churn": 0.0},
+            {"accepted": "rejected", "trust": None, "churn": 0.0}]
+    agg = outcomes.aggregate(recs)
+    assert agg["mean_trust"] == 4.0
+    assert agg["accepted_rate"] == 0.5

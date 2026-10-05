@@ -54,7 +54,8 @@ def load_plan(repo: Path, plan_dir: Path, manifest: Manifest) -> None:
             "tasks": [
                 {"id": t.id, "title": t.title, "files": t.files,
                  "dependencies": t.dependencies,
-                 "acceptance_criteria": t.acceptance_criteria}
+                 "acceptance_criteria": t.acceptance_criteria,
+                 "context": t.context}
                 for t in manifest.tasks
             ],
         }, indent=2),
@@ -64,15 +65,42 @@ def load_plan(repo: Path, plan_dir: Path, manifest: Manifest) -> None:
     write_phase(plan_dir, "executing")
 
 
-def complete(repo: Path, plan_dir: Path, task_id: str, title: str) -> None:
+def changed_paths(repo: Path) -> list[str]:
+    """Every modified, staged, deleted, or untracked path (ignored files excluded)."""
+    entries = _git(repo, "status", "--porcelain", "-z", "--untracked-files=all").split("\0")
+    paths: list[str] = []
+    it = iter(entries)
+    for entry in it:
+        if not entry:
+            continue
+        paths.append(entry[3:])
+        if entry[0] in "RC":
+            next(it, None)  # a rename/copy is followed by its source path
+    return paths
+
+
+def complete(repo: Path, plan_dir: Path, task_id: str, title: str,
+             files: list[str] | None = None) -> list[str]:
+    """Mark a task done and commit its changes; return changed paths left uncommitted.
+
+    With `files`, only those paths are staged, so one task's commit never sweeps up
+    another task's (or a stray) change. Without them, everything is committed.
+    """
     state = read_state(plan_dir)
     if task_id not in state["completed"]:
         state["completed"].append(task_id)
     write_state(plan_dir, state)
 
-    if _git(repo, "status", "--porcelain").strip():
-        _git(repo, "add", "-A")
+    changed = changed_paths(repo)
+    if files:
+        mine = [p for p in changed if p in set(files)]
+        leftovers = [p for p in changed if p not in set(files)]
+    else:
+        mine, leftovers = changed, []
+    if mine:
+        _git(repo, "add", "-A", "--", *mine)
         _git(repo, "commit", "-m", f"[{task_id}] {title}")
+    return leftovers
 
 
 def verify(repo: Path, plan_dir: Path) -> dict:

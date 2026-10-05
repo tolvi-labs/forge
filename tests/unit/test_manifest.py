@@ -60,3 +60,27 @@ def test_load_manifest_rejects_unknown_dependency(tmp_path):
     ]}
     with pytest.raises(ManifestError):
         load_manifest(_write(tmp_path, bad))
+
+
+CONTEXT = {
+    "decisions": [{"path": "vault/decisions/d.md", "title": "D", "rationale": "why"}],
+    "refs": [{"file": "src/a.py", "line": 2, "symbol": "f"}],
+    "interfaces": {"consumes": ["f() -> int"], "produces": ["g()"]},
+}
+
+
+def test_task_carries_optional_context():
+    m = Manifest.from_dict({"feature": "F", "tasks": [
+        {"id": "a", "title": "A", "acceptance_criteria": ["x"], "context": CONTEXT},
+        {"id": "b", "title": "B", "acceptance_criteria": ["y"]},
+    ]})
+    assert m.task("a").context == CONTEXT
+    assert m.task("b").context == {}
+
+
+def test_schema_rejects_non_object_context(tmp_path):
+    p = tmp_path / "tasks.json"
+    p.write_text(json.dumps({"feature": "F", "tasks": [
+        {"id": "a", "title": "A", "acceptance_criteria": ["x"], "context": "nope"}]}))
+    with pytest.raises(ManifestError):
+        load_manifest(p)

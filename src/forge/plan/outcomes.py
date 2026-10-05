@@ -85,16 +85,34 @@ def _sum_tokens(inference_log: Path, start: datetime.datetime,
     return tokens, duration, mean_rate
 
 
-def compute_task_metrics(repo: Path, task, inference_log: Path) -> dict:
+def compute_task_metrics(repo: Path, task, inference_log: Path,
+                         apply_results: dict | None = None) -> dict:
+    """Produced lines, rework, and local tokens for one task's commit.
+
+    For a task applied by `forge agents run --apply`, rework is measured from the
+    run's last model commit, only on files this task edited last, so a later model
+    task's edits to a shared file never count as human rework; tokens come from the
+    run's own per-task count instead of the inference-log time window.
+    """
     sha = _find_task_commit(repo, task.id)
     if sha is None:
         return {"commit": None, "produced_lines": 0, "rework_lines": 0, "churn": 0.0,
                 "local_tokens": 0, "duration_ms": 0.0, "tokens_per_sec": 0.0}
     produced, _ = _sum_numstat(repo, ["show", "--format=", sha], task.files)
-    r_added, r_deleted = _sum_numstat(repo, ["diff", sha], task.files)
+    applied = next((t for t in (apply_results or {}).get("tasks", [])
+                    if t["id"] == task.id and t.get("status") == "applied"), None)
+    if applied is not None:
+        owned = [f for f, owner in apply_results["file_owner"].items()
+                 if owner == task.id and f in task.files]
+        r_added, r_deleted = (_sum_numstat(repo, ["diff", apply_results["model_tip"]], owned)
+                              if owned else (0, 0))
+    else:
+        r_added, r_deleted = _sum_numstat(repo, ["diff", sha], task.files)
     rework = r_added + r_deleted
     tokens, duration, rate = _sum_tokens(
         inference_log, _commit_time(repo, f"{sha}^"), _commit_time(repo, sha))
+    if applied is not None:
+        tokens = applied.get("tokens", 0)
     return {
         "commit": sha,
         "produced_lines": produced,
@@ -126,6 +144,8 @@ def aggregate(records: list[dict]) -> dict:
     for bucket in by_type.values():
         bucket["rate"] = round(bucket["accepted"] / bucket["total"], 4)
     rates = [r["tokens_per_sec"] for r in records if r.get("tokens_per_sec", 0) > 0]
+    # auto-recorded rejections carry no trust score
+    trusts = [r["trust"] for r in records if r.get("trust") is not None]
     reasons: dict[str, int] = {}
     for r in records:
         reason = r.get("failure_reason", "")
@@ -140,6 +160,6 @@ def aggregate(records: list[dict]) -> dict:
         "median_churn": round(statistics.median(r.get("churn", 0.0) for r in records), 4),
         "local_tokens": sum(r.get("local_tokens", 0) for r in records),
         "mean_tokens_per_sec": round(sum(rates) / len(rates), 1) if rates else 0.0,
-        "mean_trust": round(statistics.mean(r.get("trust", 0) for r in records), 2),
+        "mean_trust": round(statistics.mean(trusts), 2) if trusts else 0.0,
         "failure_reasons": reasons,
     }

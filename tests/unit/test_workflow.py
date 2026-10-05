@@ -118,3 +118,38 @@ def test_verify_does_not_overwrite_done_phase(tmp_path):
     # verify should not overwrite "done"
     workflow.verify(repo, pdir)
     assert workflow.read_phase(pdir) == "done"
+
+
+def test_load_plan_snapshot_keeps_task_context(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    data = {"feature": "F", "tasks": [
+        {"id": "t", "title": "T", "acceptance_criteria": ["a"],
+         "context": {"refs": [{"file": "a.py", "line": 1, "symbol": "f"}]}}]}
+    p = tmp_path / "tasks.json"
+    p.write_text(json.dumps(data))
+    workflow.load_plan(repo, pdir, load_manifest(p))
+    snap = json.loads((pdir / "manifest.json").read_text())
+    assert snap["tasks"][0]["context"] == data["tasks"][0]["context"]
+
+
+def test_complete_commits_only_task_files_and_reports_leftovers(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    workflow.load_plan(repo, pdir, _manifest(tmp_path))
+    (repo / "feature.py").write_text("def f(): return 1\n")
+    (repo / "stray.txt").write_text("not mine\n")
+    leftovers = workflow.complete(repo, pdir, "task-001", "first", files=["feature.py"])
+    committed = _git(repo, "show", "--name-only", "--format=", "HEAD").stdout.split()
+    assert committed == ["feature.py"]
+    assert leftovers == ["stray.txt"]
+
+
+def test_complete_with_files_but_no_changes_does_not_commit(tmp_path):
+    repo = _repo(tmp_path)
+    pdir = tmp_path / "plandir"
+    workflow.load_plan(repo, pdir, _manifest(tmp_path))
+    (repo / "stray.txt").write_text("not mine\n")
+    before = _git(repo, "rev-list", "--count", "HEAD").stdout.strip()
+    workflow.complete(repo, pdir, "task-001", "first", files=["feature.py"])
+    assert _git(repo, "rev-list", "--count", "HEAD").stdout.strip() == before

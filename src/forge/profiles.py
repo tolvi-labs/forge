@@ -23,6 +23,8 @@ class Profile:
     rag_top_k: int
     rerank: bool
     max_context_tokens: int
+    reply_reserve_tokens: int = 8192
+    tokenizer_margin: float = 0.10
 
 
 def list_profiles() -> list[str]:
@@ -49,4 +51,6 @@ def load_profile(name: str) -> Profile:
         rag_top_k=int(data.get("rag_top_k", 6)),
         rerank=bool(data.get("rerank", True)),
         max_context_tokens=int(data.get("max_context_tokens", 65536)),
+        reply_reserve_tokens=int(data.get("reply_reserve_tokens", 8192)),
+        tokenizer_margin=float(data.get("tokenizer_margin", 0.10)),
     )

@@ -24,6 +24,7 @@ TASKS_SCHEMA = {
                     "files": {"type": "array", "items": {"type": "string"}},
                     "dependencies": {"type": "array", "items": {"type": "string"}},
                     "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+                    "context": {"type": "object"},
                 },
             },
         },
@@ -42,6 +43,7 @@ class Task:
     files: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
     acceptance_criteria: list[str] = field(default_factory=list)
+    context: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -61,6 +63,7 @@ class Manifest:
                     files=list(t.get("files", [])),
                     dependencies=list(t.get("dependencies", [])),
                     acceptance_criteria=list(t.get("acceptance_criteria", [])),
+                    context=dict(t.get("context", {})),
                 )
                 for t in data["tasks"]
             ],
