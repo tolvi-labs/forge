@@ -1,16 +1,18 @@
 # Forge
 
-A local-first AI development environment. A tuned local model (qwen2.5-coder via Ollama) does the high-volume implementation work; Claude plans and verifies. Zero token cost and full privacy during execution.
+A local-first AI development environment. A tuned local model sized to your RAM does the high-volume implementation work: `forge-coder` via Ollama, built on qwen3-coder:30b on 24GB+ machines (qwen3-coder-next at 48GB+) and on qwen2.5-coder 14b or 7b below that. Claude plans and verifies. Zero token cost and full privacy during execution.
 
-> **Status:** Pre-1.0. MVP complete (phases P1–P5). The full local loop works end-to-end; packaged distribution (Homebrew / PyPI / Docker) is the remaining work. See [`ROADMAP.md`](./ROADMAP.md).
+> **Status:** Pre-1.0. The full local loop works end-to-end, including `forge agents run --apply`. Forge ships on PyPI (`tolvi-forge`); there is no Homebrew formula (see [`RELEASE.md`](./RELEASE.md)). See [`ROADMAP.md`](./ROADMAP.md).
 
 ## The workflow
 
 ```
-Claude (plan → tasks.json) → Forge (execute, local, $0) → Claude (verify diff)
+Magellan or Claude Code (plan → tasks.json) → Forge (execute, local, $0) → Claude (verify diff)
 ```
 
-Claude is better at *thinking*; the local model is better at *doing at scale*. Forge is the execution layer between them. It indexes your codebase, answers questions with that code (and your decisions) in context, drives a Claude-produced plan task-by-task, and hands the diff back for review.
+Claude is better at *thinking*; the local model is better at *doing at scale*. Forge is the execution layer between them. It indexes your codebase, answers questions with that code (and your decisions) in context, drives a `tasks.json` plan task-by-task, and hands the diff back for review.
+
+[Magellan](https://github.com/tolvi-labs/magellan) compiles a Bastion-hardened brief into a `tasks.json` in the repo (`docs/superpowers/plans/YYYY-MM-DD-<feature>-tasks.json`). Each task names the files it may change, its acceptance criteria, and the context it needs: the vault decisions, code references, and interfaces that bear on it. Forge runs that plan on the local model with `forge plan load <tasks.json> --path <repo>` and `forge agents run --apply --path <repo>`. For each task, the model sees the task's files in full plus that context and edits them; a review agent checks the diff, and each approved task is committed on a `forge/<feature>` branch. A task that fails is rejected with its reason and the tasks that depend on it are skipped, so you or Claude can pick it up. Review the branch with `forge verify`, then record each task with `forge outcome`. Claude Code can produce the `tasks.json` too: the [`/forge`](./integrations/claude-code/commands/forge.md) command portions a hardened plan into one, or loads an existing Magellan plan directly.
 
 ## Tolvi is the substrate
 
@@ -65,7 +67,7 @@ Bootstrap writes the Continue config to `~/.continue/config.yaml` automatically.
 
 The config wires four models automatically:
 - **Chat / Edit / Apply** → `qwen2.5-coder:7b` (fast, best for everyday coding questions)
-- **Chat (Deep)** → `forge-coder` (qwen3-coder:30b, long context, switch to this for architecture or multi-file work)
+- **Chat (Deep)** → `forge-coder` (the tuned model sized to your RAM, long context, switch to this for architecture or multi-file work)
 - **Autocomplete** → `qwen2.5-coder:7b` (best-effort; latency tracks your hardware)
 - **Embeddings** → `nomic-embed-text`
 
@@ -79,7 +81,7 @@ forge search "auth token refresh"   # inspect what retrieval returns
 forge chat -m "how does sign-in work?"   # ask, with CAG+RAG (and your Tolvi vault) in context
 
 # Claude → Local → Claude
-forge plan load tasks.json          # load a Claude-produced plan (schema-validated)
+forge plan load tasks.json          # load a Magellan or Claude Code plan (schema-validated)
 forge agents run --apply            # the local model implements every task, one commit each on forge/<feature>
 forge verify                        # export the diff + manifest for Claude to review
 ```
@@ -94,7 +96,7 @@ forge verify                        # export the diff + manifest for Claude to r
 | `forge index [--watch]` | Tree-sitter chunk + embed a repo into a local ChromaDB index |
 | `forge watch` | Live TUI dashboard: auto-discovers active plans, loop phase, inference rate, context fill |
 | `forge search` / `chat` | Semantic retrieval; chat with CAG+RAG context (Tolvi vault included) |
-| `forge plan load/next/complete/status` | Drive a Claude `tasks.json` in dependency order by hand; `complete` commits only the task's own files |
+| `forge plan load/next/complete/status` | Load a `tasks.json` (from Magellan or Claude Code) and drive it in dependency order by hand; `complete` commits only the task's own files |
 | `forge verify` | Export the diff since plan baseline + manifest for Claude's review |
 | `forge outcome` / `forge report` | Record a completed task's outcome (rework churn + local tokens, auto-filled) and pool the dogfooding metrics: acceptance, churn, tokens, trust |
 | `forge profile list/set` | Choose the stack profile that shapes the context window |
@@ -123,10 +125,10 @@ Acceptance rate is the "is the local model good enough" number, and rework churn
 
 - **Index**: Tree-sitter AST chunking across 9 languages (with a line-based fallback), local embeddings via `nomic-embed-text`, a ChromaDB store with file-checksum incremental re-indexing.
 - **Context**: a hybrid **CAG + RAG** window: stable always-on context (manifests, README, the Tolvi vault) plus the top semantically-relevant code chunks (hard-capped to avoid lost-in-the-middle), tuned per [stack profile](./src/forge/profiles_data).
-- **Workflow**: `tasks.json` is the Claude↔Forge handoff contract; Forge validates it, keeps each task's plan context, has the local model edit with SEARCH/REPLACE blocks it applies and checks itself, commits each approved task on its own branch, and exports a verifiable diff.
+- **Workflow**: `tasks.json` is the Claude↔Forge handoff contract; Forge validates it, keeps each task's plan context, has the local model edit with SEARCH/REPLACE blocks it applies and checks itself, commits each approved task on its own branch, and exports a verifiable diff. At apply time the model sees each task's files in full, the task's plan context (decisions, code refs, interfaces), and related code from `forge index` when the repo is indexed, within a budget sized to the smaller of the stack profile's and the hardware's context window, less a reply reserve.
 - **Editors & tools**: Continue.dev (VS Code, primary) and Cursor against the same Ollama backend; a pre-wired, npm-verified [MCP layer](./mcp/servers.json) (git, github, jira, gcloud, firebase, context7, sequential-thinking, playwright) configured for Claude Code.
 
-Everything runs locally. No code leaves the machine during execution. Architecture and design notes live in [`docs/`](./docs).
+Everything runs locally. No code leaves the machine during execution. Design decisions live in [`vault/decisions/`](./vault/decisions).
 
 ## License
 

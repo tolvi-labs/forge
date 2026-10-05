@@ -4,7 +4,9 @@ Guidance for coding agents working in this repo.
 
 ## What this is
 
-Forge runs routine engineering against an on-device model that is not working blind: the Tolvi vault is held in always-on context. Correct-by-recall execution at zero per-token cost, on a machine the code never leaves.
+Forge runs routine engineering against an on-device model that is not working blind: `forge chat` holds the repo's Tolvi vault in always-on context, and plan runs get the vault decisions each task carries. Correct-by-recall execution at zero per-token cost, on a machine the code never leaves.
+
+Plan execution: `forge agents run --apply` implements a loaded `tasks.json` (for example one compiled by Magellan) task by task, giving the model each task's files plus its Magellan context (decisions, code refs, interfaces), and commits approved tasks on a `forge/<feature>` branch.
 
 ## Build and test
 

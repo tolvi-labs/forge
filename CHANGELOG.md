@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `forge agents run --apply [--path <repo>] [--json]`: the local model implements each task of the loaded plan. It sees the full current contents of the task's files plus the plan's per-task `context`, answers with SEARCH/REPLACE blocks that Forge applies and checks itself, and each change that stays inside the task's files and passes the review agent is committed as `[id] title` on a `forge/<feature>` branch. A failed task gets one retry, then is rejected, and the tasks that depend on it are skipped. Rerunning on the branch resumes. Results are written to `results.json` in the plan directory.
+- `forge agents run --apply [--path <repo>] [--json]`: the local model implements each task of the loaded plan. It sees the full current contents of the task's files plus the plan's per-task `context` and, when the repo has been indexed with `forge index`, related code retrieved from that index, answers with SEARCH/REPLACE blocks that Forge applies and checks itself, and each change that stays inside the task's files and passes the review agent is committed as `[id] title` on a `forge/<feature>` branch. A failed task gets one retry, then is rejected, and the tasks that depend on it are skipped. Rerunning on the branch resumes. Results are written to `results.json` in the plan directory.
 - `tasks.json` tasks may carry an optional `context` object (decisions, refs, interfaces, as Magellan emits), which the plan snapshot now keeps.
 - Stack profiles accept `reply_reserve_tokens` (default 8192) and `tokenizer_margin` (default 0.10). The apply budget is the smaller of the profile's and the hardware profile's context windows, less both.
 
