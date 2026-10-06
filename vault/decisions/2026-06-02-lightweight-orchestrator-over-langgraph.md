@@ -4,7 +4,7 @@ status: active
 date: 2026-06-02
 repo: forge
 ticket: none
-superseded_in_part_by: [[2026-10-05-forge-applies-diffs-on-branch]]
+superseded_in_part_by: 2026-10-05-forge-applies-diffs-on-branch
 ---
 
 # Multi-agent scaffold; LangGraph deferred

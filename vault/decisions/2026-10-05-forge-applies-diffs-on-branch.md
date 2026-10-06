@@ -7,7 +7,7 @@ ticket: none
 negotiable: true
 user_impact: high
 product_area: Batch execution
-supersedes_in_part: [[2026-06-02-lightweight-orchestrator-over-langgraph]], [[2026-07-08-measure-ship-gate-from-plan-loop]]
+supersedes_in_part: [2026-06-02-lightweight-orchestrator-over-langgraph, 2026-07-08-measure-ship-gate-from-plan-loop]
 ---
 
 # Forge applies reviewed local-model edits on a dedicated branch

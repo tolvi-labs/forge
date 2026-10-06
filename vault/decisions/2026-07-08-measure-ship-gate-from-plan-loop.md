@@ -6,7 +6,7 @@ status: active
 ticket: none
 user_impact: none
 product_area: Release
-superseded_in_part_by: [[2026-10-05-forge-applies-diffs-on-branch]]
+superseded_in_part_by: 2026-10-05-forge-applies-diffs-on-branch
 ---
 
 # Measure the ship gate as a byproduct of the plan loop
